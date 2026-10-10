@@ -1,0 +1,25 @@
+{
+  "openai": {
+    "type": "oauth",
+    "access": "",
+    "refresh": "",
+    "expires": 0,
+    "clientId": "",
+    "scopes": [
+      "chatgpt.tokens.use.direct",
+      "email",
+      "offline_access",
+      "openid",
+      "profile",
+      "resource.invoke"
+    ]
+  },
+  "my-provider": {
+    "type": "api_key",
+    "key": ""
+  },
+  "antigravity": {
+    "type": "api_key",
+    "key": ""
+  }
+}

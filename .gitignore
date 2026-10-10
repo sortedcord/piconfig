@@ -1,0 +1,10 @@
+# Authentication & secrets
+auth.json
+mcp-auth.json
+
+# Session history & cached data
+sessions/
+models-store.json
+
+# Binaries
+bin/

@@ -1,0 +1,115 @@
+{
+  "providers": {
+    "my-provider": {
+      "baseUrl": "https://ai.adityagupta.dev/v1",
+      "authHeader": true,
+      "models": [
+        {
+          "id": "luna",
+          "name": "GPT-6 Luna",
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {"off": null, "minimal": null, "low": null, "medium": "medium", "high": "high", "xhigh": "xhigh", "max": null},
+          "input": ["text", "image"],
+          "cost": {"input": 0.1, "output": 0.5, "cacheRead": 0.01, "cacheWrite": 0.125},
+          "contextWindow": 1000000,
+          "maxTokens": 128000
+        },
+        {
+          "id": "sol",
+          "name": "GPT-6.1 Sol",
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {"off": null, "minimal": null, "low": null, "medium": null, "high": "high", "xhigh": "xhigh", "max": "max"},
+          "input": ["text", "image"],
+          "cost": {"input": 2, "output": 10, "cacheRead": 0.2, "cacheWrite": 2.5},
+          "contextWindow": 1000000,
+          "maxTokens": 128000
+        },
+        {
+          "id": "astra",
+          "name": "GPT-6 Astra",
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {"off": null, "minimal": null, "low": null, "medium": null, "high": "high", "xhigh": null, "max": "max"},
+          "input": ["text", "image"],
+          "cost": {"input": 10, "output": 50, "cacheRead": 1, "cacheWrite": 12.5},
+          "contextWindow": 1000000,
+          "maxTokens": 128000
+        },
+        {
+          "id": "Antigravity/gemini-3.8-flash-tiered",
+          "name": "Gemini 3.8 Flash",
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {"off": null, "minimal": null, "low": "low", "medium": "medium", "high": "high", "xhigh": null, "max": null},
+          "input": ["text", "image"],
+          "cost": {"input": 0.75, "output": 3.75, "cacheRead": 0.075, "cacheWrite": 0},
+          "contextWindow": 1000000,
+          "maxTokens": 128000
+        },
+        {
+          "id": "Antigravity/gemini-3.5-flash-lite",
+          "name": "Gemini 3.5 Flash Lite",
+          "api": "openai-responses",
+          "reasoning": true,
+          "thinkingLevelMap": {"off": null, "minimal": null, "low": "low", "medium": "medium", "high": "high", "xhigh": null, "max": null},
+          "input": ["text", "image"],
+          "cost": {"input": 0.25, "output": 1.5, "cacheRead": 0.025, "cacheWrite": 0},
+          "contextWindow": 1048576,
+          "maxTokens": 65535
+        },
+        {
+          "id": "Antigravity/claude-opus-4-6-thinking",
+          "name": "Claude Opus 4.6 (Thinking)",
+          "api": "openai-responses",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {"input": 5, "output": 25, "cacheRead": 0.5, "cacheWrite": 6.25},
+          "contextWindow": 250000,
+          "maxTokens": 64000
+        },
+        {
+          "id": "Antigravity/gpt-oss-120b-medium",
+          "name": "GPT-OSS 120B Medium",
+          "api": "openai-responses",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {"input": 0.15, "output": 0.6, "cacheRead": 0.075, "cacheWrite": 0},
+          "contextWindow": 128000,
+          "maxTokens": 32000
+        },
+        {
+          "id": "Antigravity/claude-sonnet-4-6",
+          "name": "Claude Sonnet 4.6",
+          "api": "openai-completions",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "cost": {"input": 3, "output": 15, "cacheRead": 0.3, "cacheWrite": 3.75},
+          "contextWindow": 250000,
+          "maxTokens": 64000
+        },
+        {
+          "id": "bedrock/anthropic.claude-sonnet-5",
+          "name": "Claude Sonnet 5",
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {"off": null, "minimal": null, "low": null, "medium": "medium", "high": "high", "xhigh": null, "max": "max"},
+          "input": ["text", "image"],
+          "cost": {"input": 3, "output": 15, "cacheRead": 0.3, "cacheWrite": 3.75},
+          "contextWindow": 1000000,
+          "maxTokens": 128000
+        },
+        {
+          "id": "bedrock/anthropic.claude-opus-5-5",
+          "name": "Claude Opus 5.5",
+          "api": "openai-completions",
+          "reasoning": true,
+          "thinkingLevelMap": {"off": null, "minimal": null, "low": null, "medium": "medium", "high": "high", "xhigh": null, "max": "max"},
+          "contextWindow": 1000000,
+          "maxTokens": 128000
+        }
+      ]
+    }
+  }
+}
