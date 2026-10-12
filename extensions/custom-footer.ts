@@ -2,37 +2,71 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { readStoredCredential, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
-const LIMIT_URL = "https://ai.adityagupta.dev/providers/antigravity/status/limit";
+const ANTIGRAVITY_LIMIT_URL = "https://ai.adityagupta.dev/providers/antigravity/status/limit";
+const CODEX_LIMIT_URL = "https://ai.adityagupta.dev/providers/codex/status/limit";
 
-let quotaData: any = null;
-let fetching = false;
+let antigravityQuotaData: any = null;
+let antigravityFetching = false;
 
-async function fetchLimits(onDone?: () => void) {
-	if (fetching) return;
+let codexQuotaData: any = null;
+let codexFetching = false;
+
+async function fetchAntigravityLimits(onDone?: () => void) {
+	if (antigravityFetching) return;
 	const cred = readStoredCredential("antigravity");
 	const apiKey = cred?.type === "api_key" ? cred.key : undefined;
 	if (!apiKey) return;
-	fetching = true;
+	antigravityFetching = true;
 	try {
-		const res = await fetch(LIMIT_URL, {
+		const res = await fetch(ANTIGRAVITY_LIMIT_URL, {
 			headers: { "x-goog-api-key": apiKey },
 		});
 		if (res.ok) {
-			quotaData = await res.json();
+			antigravityQuotaData = await res.json();
 			onDone?.();
 		}
 	} catch {
 		// ignore network errors
 	} finally {
-		fetching = false;
+		antigravityFetching = false;
 	}
 }
 
-function getPoolForModel(modelId?: string, modelName?: string): "gemini" | "third_party" | null {
-	const lower = `${modelId || ""} ${modelName || ""}`.toLowerCase();
+async function fetchCodexLimits(onDone?: () => void) {
+	if (codexFetching) return;
+	const cred = readStoredCredential("codex");
+	const apiKey = cred?.type === "api_key" ? cred.key : undefined;
+	if (!apiKey) return;
+	codexFetching = true;
+	try {
+		const res = await fetch(CODEX_LIMIT_URL, {
+			headers: { Authorization: `Bearer ${apiKey}` },
+		});
+		if (res.ok) {
+			codexQuotaData = await res.json();
+			onDone?.();
+		}
+	} catch {
+		// ignore network errors
+	} finally {
+		codexFetching = false;
+	}
+}
+
+function getAntigravityPoolForModel(
+	modelId?: string,
+	modelName?: string,
+	provider?: string,
+): "gemini" | "third_party" | null {
+	const lower = `${provider || ""} ${modelId || ""} ${modelName || ""}`.toLowerCase();
 	if (!lower.includes("antigravity")) return null;
 	if (lower.includes("gemini")) return "gemini";
 	return "third_party";
+}
+
+function isCodexModel(modelId?: string, modelName?: string, provider?: string): boolean {
+	const lower = `${provider || ""} ${modelId || ""} ${modelName || ""}`.toLowerCase();
+	return lower.includes("codex");
 }
 
 function formatPercent(pct: number | undefined): string {
@@ -87,14 +121,35 @@ function formatCwdForFooter(cwd: string, home?: string): string {
 	return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
 }
 
+function formatWindowLabel(windowSeconds?: number, defaultLabel: string = "5h"): string {
+	if (windowSeconds == null) return defaultLabel;
+	if (windowSeconds === 18000) return "5h";
+	if (windowSeconds === 604800) return "weekly";
+	if (windowSeconds % 86400 === 0) return `${windowSeconds / 86400}d`;
+	if (windowSeconds % 3600 === 0) return `${windowSeconds / 3600}h`;
+	return defaultLabel;
+}
+
+function renderQuotaLimit(
+	theme: any,
+	label: string,
+	pct: number | undefined,
+): string | null {
+	if (pct == null) return null;
+	const color = getLimitColor(pct);
+	return `${theme.fg("dim", `${label}: `)}${theme.fg(color, `${renderBlockBar(pct)} ${formatPercent(pct)}`)}`;
+}
+
 export default function (pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		ctx.ui.setFooter((tui, theme, footerData) => {
 			const unsubBranch = footerData.onBranchChange(() => tui.requestRender());
 
 			const updateQuota = () => {
-				if (getPoolForModel(ctx.model?.id, ctx.model?.name)) {
-					fetchLimits(() => tui.requestRender());
+				if (getAntigravityPoolForModel(ctx.model?.id, ctx.model?.name, ctx.model?.provider)) {
+					fetchAntigravityLimits(() => tui.requestRender());
+				} else if (isCodexModel(ctx.model?.id, ctx.model?.name, ctx.model?.provider)) {
+					fetchCodexLimits(() => tui.requestRender());
 				}
 			};
 
@@ -158,19 +213,47 @@ export default function (pi: ExtensionAPI) {
 						parts.push(theme.getThinkingBorderColor(thinkingLevel)(thinkingLevel));
 					}
 
-					// 6. Model limits (for Antigravity models)
-					const poolName = getPoolForModel(ctx.model?.id, ctx.model?.name);
-					if (poolName && quotaData?.pools?.[poolName]) {
-						const pool = quotaData.pools[poolName];
-						if (pool.five_hour?.remaining_percent != null) {
-							const pct = pool.five_hour.remaining_percent;
-							const color = getLimitColor(pct);
-							parts.push(`${theme.fg("dim", "5h: ")}${theme.fg(color, `${renderBlockBar(pct)} ${formatPercent(pct)}`)}`);
-						}
-						if (pool.weekly?.remaining_percent != null) {
-							const pct = pool.weekly.remaining_percent;
-							const color = getLimitColor(pct);
-							parts.push(`${theme.fg("dim", "weekly: ")}${theme.fg(color, `${renderBlockBar(pct)} ${formatPercent(pct)}`)}`);
+					// 6. Model limits (for Antigravity and Codex models)
+					const antigravityPool = getAntigravityPoolForModel(
+						ctx.model?.id,
+						ctx.model?.name,
+						ctx.model?.provider,
+					);
+					if (antigravityPool && antigravityQuotaData?.pools?.[antigravityPool]) {
+						const pool = antigravityQuotaData.pools[antigravityPool];
+						const fiveHour = pool.five_hour ?? pool.primary;
+						const weekly = pool.weekly ?? pool.secondary;
+						const item1 = renderQuotaLimit(
+							theme,
+							formatWindowLabel(fiveHour?.window_seconds, "5h"),
+							fiveHour?.remaining_percent,
+						);
+						if (item1) parts.push(item1);
+						const item2 = renderQuotaLimit(
+							theme,
+							formatWindowLabel(weekly?.window_seconds, "weekly"),
+							weekly?.remaining_percent,
+						);
+						if (item2) parts.push(item2);
+					} else if (isCodexModel(ctx.model?.id, ctx.model?.name, ctx.model?.provider)) {
+						const pool =
+							codexQuotaData?.pools?.codex ??
+							(codexQuotaData?.pools ? Object.values(codexQuotaData.pools)[0] : null);
+						if (pool) {
+							const primary = pool.five_hour ?? pool.primary;
+							const secondary = pool.weekly ?? pool.secondary;
+							const item1 = renderQuotaLimit(
+								theme,
+								formatWindowLabel(primary?.window_seconds, "5h"),
+								primary?.remaining_percent,
+							);
+							if (item1) parts.push(item1);
+							const item2 = renderQuotaLimit(
+								theme,
+								formatWindowLabel(secondary?.window_seconds, "weekly"),
+								secondary?.remaining_percent,
+							);
+							if (item2) parts.push(item2);
 						}
 					}
 

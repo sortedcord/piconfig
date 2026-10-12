@@ -1,10 +1,21 @@
 {
+  "antigravity": {
+    "key": "",
+    "type": "api_key"
+  },
+  "codex": {
+    "key": "",
+    "type": "api_key"
+  },
+  "my-provider": {
+    "key": "",
+    "type": "api_key"
+  },
   "openai": {
-    "type": "oauth",
     "access": "",
-    "refresh": "",
-    "expires": 0,
     "clientId": "",
+    "expires": 0,
+    "refresh": "",
     "scopes": [
       "chatgpt.tokens.use.direct",
       "email",
@@ -12,14 +23,7 @@
       "openid",
       "profile",
       "resource.invoke"
-    ]
-  },
-  "my-provider": {
-    "type": "api_key",
-    "key": ""
-  },
-  "antigravity": {
-    "type": "api_key",
-    "key": ""
+    ],
+    "type": "oauth"
   }
 }
