@@ -2,569 +2,422 @@
   {
     "id": 1,
     "name": "zero-value-intent-signal",
-    "description": "var vs := signals intent: var for zero-value start, := for non-zero — even when the zero value IS the business default",
-    "prompt": "Write a Go file `session.go` in package `session`. Create a Session struct with fields: userID string, requestCount int, isAuthenticated bool, lastError error, startedAt time.Time, tags []string. Add a constructor NewSession(userID string) that initializes the struct. In the constructor, requestCount starts at zero (it will be incremented on each use), isAuthenticated starts false (it must be explicitly set after login), lastError starts nil, startedAt is set to time.Now(), and tags is initialized as an empty slice. Also add a local variable inside a method Describe() that builds a description string from a fixed prefix 'session:'.",
-    "trap": "Model uses := for all fields including zero-value ones (requestCount := 0, isAuthenticated := false) or uses var for non-zero assignments like startedAt, obscuring intent",
+    "description": "Rely on useful zero values without prohibiting idiomatic initialized locals.",
+    "prompt": "Write session.go in package session. Define Session with userID string, requestCount int, isAuthenticated bool, lastError error, startedAt time.Time, and tags []string. NewSession initializes the user ID and start time; other fields start at zero. Tags are internal state with no JSON contract. Describe builds a description from an initialized local prefix.",
+    "trap": "Explicitly initializes every zero field or requires a non-nil internal slice without a contract.",
     "assertions": [
-      {
-        "id": "1.1",
-        "text": "requestCount is NOT explicitly initialized to 0 in the constructor — the zero value is relied upon via var or struct literal without that field, not via requestCount := 0"
-      },
-      {
-        "id": "1.2",
-        "text": "startedAt uses := assignment (startedAt := time.Now() or field assignment) — NOT var startedAt time.Time followed by assignment — because it has a non-zero meaningful value"
-      },
-      {
-        "id": "1.3",
-        "text": "The fixed prefix string variable in Describe() uses := (prefix := 'session:') — not var prefix string = 'session:'"
-      },
-      {
-        "id": "1.4",
-        "text": "tags is initialized with []string{} or make([]string, 0) — never nil — because nil slices serialize to null in JSON"
-      }
+      {"id": "1.1", "text": "Constructor relies on struct zero values for requestCount, isAuthenticated, and lastError rather than creating redundant initialization locals."},
+      {"id": "1.2", "text": "Start time is initialized directly with time.Now, and the local prefix uses an ordinary initialized declaration; no unnecessary declare-then-assign sequence."},
+      {"id": "1.3", "text": "Nil tags are accepted because no non-nil collection representation is required."}
     ]
   },
   {
     "id": 2,
-    "name": "empty-slice-map-not-nil",
-    "description": "Empty collections initialized as []T{} or make(), never nil",
-    "prompt": "Write a Go file `handler.go` in package `api`. Create a Handler struct. Add a method ListUsers that returns a slice of User structs (define User with Name and Email fields). Add a method GetTags that returns a map[string]string. Both methods should return empty collections when there's no data. Add a method BuildResponse that takes a slice of results and a map of metadata and processes them.",
-    "trap": "Model returns nil slices/maps or uses uninitialized var declarations for empty collections, causing nil != empty issues in JSON serialization and caller code",
+    "name": "collection-contracts-not-never-nil",
+    "description": "Distinguish internal accumulation, safe nil maps, and writable map contracts.",
+    "prompt": "Write helpers in package users. ActiveUsers filters a []User into a result with no serialization or non-nil contract. LookupLabel reads from a possibly nil map[string]string. NewLabels returns a map callers may immediately assign entries into. Explain the relevant nil behavior.",
+    "trap": "Bans nil collections or incorrectly assumes a nil map lookup panics.",
     "assertions": [
-      {
-        "id": "2.1",
-        "text": "Empty slice return uses []User{} or make([]User, 0) — never returns nil or an uninitialized var declaration without assignment"
-      },
-      {
-        "id": "2.2",
-        "text": "Empty map return uses map[string]string{} or make(map[string]string) — never returns nil or an uninitialized var declaration without assignment"
-      },
-      {
-        "id": "2.3",
-        "text": "When capacity is known (e.g., from len(input)), make() with capacity hint is used for preallocating slices or maps"
-      }
+      {"id": "2.1", "text": "ActiveUsers may return a nil slice on no matches; the answer does not claim this is non-idiomatic or unsafe for append/range."},
+      {"id": "2.2", "text": "LookupLabel permits reading a nil map and correctly obtains the zero value or comma-ok false."},
+      {"id": "2.3", "text": "NewLabels returns an initialized map because the caller is promised immediate entry assignment."}
     ]
   },
   {
     "id": 3,
-    "name": "named-struct-fields-nested",
-    "description": "All struct literals use named fields, including nested and anonymous structs",
-    "prompt": "Write a Go file `middleware.go` in package `middleware`. Create a RateLimiter struct with fields: windowSize time.Duration, maxRequests int, perIP bool. Create a middleware chain config using a struct literal with nested structs: a TimeoutConfig containing duration and errorMessage, a RetryConfig containing maxAttempts int and backoff time.Duration, and a CircuitBreakerConfig containing threshold float64 and resetAfter time.Duration. Instantiate each of these structs as part of a larger MiddlewareConfig struct. Also create a tls.Config with MinVersion and a list of cipher suites.",
-    "trap": "Model uses positional struct literals for the nested configs since they have few fields — e.g., TimeoutConfig{5*time.Second, 'timeout'} — which silently breaks when fields are reordered",
+    "name": "keyed-struct-fields-nested",
+    "description": "Keyed literals expose meaning in configuration, including nested structures.",
+    "prompt": "Create RateLimiter, TimeoutConfig, RetryConfig, and MiddlewareConfig types and initialize a nested middleware configuration. Include a tls.Config with a minimum TLS version. Optimize for readability and safe maintenance.",
+    "trap": "Uses unkeyed nested configuration structs or calls all composite literals field-based.",
     "assertions": [
-      {
-        "id": "3.1",
-        "text": "RateLimiter literal uses named fields (WindowSize:, MaxRequests:, PerIP:) — not positional"
-      },
-      {
-        "id": "3.2",
-        "text": "TimeoutConfig, RetryConfig, and CircuitBreakerConfig literals all use named fields — not positional — even though each has only 2-3 fields"
-      },
-      {
-        "id": "3.3",
-        "text": "tls.Config literal uses named fields (MinVersion:, CipherSuites:)"
-      },
-      {
-        "id": "3.4",
-        "text": "No struct literal in the file uses positional field syntax"
-      }
+      {"id": "3.1", "text": "Configuration struct literals use keyed fields, including nested configuration and tls.Config."},
+      {"id": "3.2", "text": "Slice, map, and array literals, if present, are not incorrectly treated as requiring struct field names."},
+      {"id": "3.3", "text": "Empty literals and omitted zero-value fields remain valid; no pointless explicit zero assignments are required."}
     ]
   },
   {
     "id": 4,
     "name": "early-return-not-nested",
-    "description": "Validation uses early returns; happy path at minimal indentation despite prompt asking for nesting",
-    "prompt": "Write a Go function ProcessOrder in package `orders` that takes an order struct (define it with fields: ID string, Items []Item, Status string, CustomerID string). The function should validate that the ID is not empty, that there is at least one item, that the status is 'pending', that the customer exists (simulate with a lookup function), compute the total price, apply a discount if total > 100, and return the final total with an error. Write it with deeply nested if-else blocks.",
-    "trap": "Model follows the prompt's instruction to use deeply nested if-else blocks, burying the happy path inside 4+ levels of indentation",
+    "description": "Validation failures precede the successful path without unnecessary nesting.",
+    "prompt": "Write ProcessOrder that validates a non-empty ID, at least one item, pending status, and an existing customer, then computes a total and applies a discount over 100. Preserve validation order and return errors to the caller. Choose a readable control-flow structure.",
+    "trap": "Buries successful processing inside nested validation branches or changes error precedence.",
     "assertions": [
-      {
-        "id": "4.1",
-        "text": "Validation checks (empty ID, no items, wrong status) use early return pattern — each check returns an error immediately rather than nesting the rest of the function inside an else block"
-      },
-      {
-        "id": "4.2",
-        "text": "The happy path (compute total, apply discount, return) is at the top level of the function body (indentation level 1), not nested inside multiple if blocks"
-      },
-      {
-        "id": "4.3",
-        "text": "The function has at most 2 levels of indentation for the main logic (excluding the error-check if blocks which return early)"
-      }
+      {"id": "4.1", "text": "Validation failures return early and the successful calculation is not nested inside the validation branches."},
+      {"id": "4.2", "text": "ID, items, status, and customer checks preserve the requested error precedence."}
     ]
   },
   {
     "id": 5,
-    "name": "no-else-after-return",
-    "description": "No else after return; default-then-override for simple assignments",
-    "prompt": "Write a Go function GetUserRole in package `auth` that takes a user struct with IsAdmin bool, IsModerator bool, and IsVerified bool fields. Return a role string: if admin return 'admin', else if moderator return 'moderator', else if verified return 'member', else return 'guest'. Also write a function SetLogLevel that takes a verbose bool and a debug bool, and sets the log level appropriately using slog.",
-    "trap": "Model uses else-if chains after return statements, adding unnecessary indentation and cognitive load",
+    "name": "no-unnecessary-else",
+    "description": "Prefer early-return branches while allowing clear ordinary assignments.",
+    "prompt": "Write GetUserRole with admin, moderator, verified member, and guest precedence. Also implement log-level selection where debug overrides verbose and verbose overrides the default. Choose readable code rather than a mandatory template.",
+    "trap": "Uses unnecessary else after return or lets verbose override debug.",
     "assertions": [
-      {
-        "id": "5.1",
-        "text": "GetUserRole does NOT use else or else-if after a return statement — either uses early returns (if isAdmin { return 'admin' }; if isModerator { return 'moderator' }) or a switch statement"
-      },
-      {
-        "id": "5.2",
-        "text": "SetLogLevel uses the default-then-override pattern: assigns a default level first, then conditionally overrides with if (not if-else chains)"
-      }
+      {"id": "5.1", "text": "GetUserRole uses a switch or early returns without unnecessary else branches after return."},
+      {"id": "5.2", "text": "Log-level selection preserves debug precedence; switch, default-then-override, or a clear if/else assignment is accepted."}
     ]
   },
   {
     "id": 6,
-    "name": "switch-over-if-else-chain",
-    "description": "Multi-branch comparisons use switch statements, not if-else chains",
-    "prompt": "Write a Go function HandleEvent in package `events` that takes an event with a Type string field. The type can be 'click', 'scroll', 'keypress', 'hover', 'focus', or 'blur'. Each type should call a different handler function. Also write a function MapStatusCode that takes an int HTTP status code and returns a human-readable string for 200, 201, 204, 400, 401, 403, 404, 500, 502, 503.",
-    "trap": "Model uses if-else chains for multi-branch string/int comparisons instead of switch statements",
+    "name": "switch-over-repeated-comparisons",
+    "description": "Use switch for readable multi-way selection and ordinary errors for external values.",
+    "prompt": "Write HandleEvent for click, scroll, keypress, hover, focus, and blur event types. Unknown event types come from clients and should be reported as errors. Also map common HTTP status codes to descriptions.",
+    "trap": "Uses a long repeated-comparison chain or panics on unknown client input.",
     "assertions": [
-      {
-        "id": "6.1",
-        "text": "HandleEvent uses a switch statement on event.Type, not an if-else chain"
-      },
-      {
-        "id": "6.2",
-        "text": "MapStatusCode uses a switch statement on the status code, not an if-else chain"
-      },
-      {
-        "id": "6.3",
-        "text": "Both switch statements include a default case"
-      }
+      {"id": "6.1", "text": "Multi-way event and status selection uses a switch where appropriate."},
+      {"id": "6.2", "text": "Unknown external event values return an error instead of panicking."}
     ]
   },
   {
     "id": 7,
-    "name": "options-struct-not-many-params",
-    "description": "Groups params into options struct, context.Context first",
-    "prompt": "Write a Go function SendNotification in package `notify` that sends a notification. It needs these parameters: ctx context.Context, userID string, message string, channel string (email/sms/push), priority int, retryCount int, dryRun bool, templateID string, metadata map[string]string, callback func(error). Put all parameters directly in the function signature.",
-    "trap": "Model follows the prompt's instruction to put all 10 parameters directly in the function signature, creating an unusable API",
+    "name": "cohesive-options-not-parameter-count",
+    "description": "Group cohesive notification settings without an arbitrary signature ceiling.",
+    "prompt": "Design a new SendNotification API needing ctx, recipient, message, delivery channel, priority, retry policy, dry-run mode, template ID, and metadata. Group settings where useful. Explain the API without citing a universal four-parameter limit.",
+    "trap": "Creates a catch-all options bag or treats a parameter count as a correctness requirement.",
     "assertions": [
-      {
-        "id": "7.1",
-        "text": "context.Context is the first parameter in the function signature"
-      },
-      {
-        "id": "7.2",
-        "text": "The function uses an options struct (or similar grouping) to reduce the parameter count to 4 or fewer in the main function signature — not all 10 parameters listed individually"
-      },
-      {
-        "id": "7.3",
-        "text": "The options struct groups related configuration (channel, priority, retryCount, dryRun, templateID, metadata, callback) into a single parameter"
-      }
+      {"id": "7.1", "text": "context.Context is first when accepted."},
+      {"id": "7.2", "text": "Related delivery configuration is grouped coherently; essential inputs and service dependencies are not indiscriminately hidden in an options bag."},
+      {"id": "7.3", "text": "The explanation does not claim Go mandates at most four parameters."}
     ]
   },
   {
     "id": 8,
     "name": "value-vs-pointer-params",
-    "description": "Value params for small types; pointers only for mutation — not pointer everything",
-    "prompt": "Write Go functions in package `users`: (1) FormatName that takes a first name string and last name string and returns the formatted full name, (2) UpdateAge that modifies a User struct's age field, (3) FindUser that takes a user ID string and returns a User pointer, (4) CompareUsers that checks if two User structs (each about 32 bytes with Name string and Age int) are equal. Use pointer parameters for all functions.",
-    "trap": "Model follows the prompt's instruction to use pointer parameters for all functions, including small value types like string and int where pointers only add indirection",
+    "description": "Choose parameters according to mutation and copy contracts, not pointer everything.",
+    "prompt": "Write signatures for FormatName with two strings, UpdateAge mutating a User, CompareUsers reading two small plain Users, and Increment reading and updating a small Counter containing sync.Mutex and an int. Explain the choices.",
+    "trap": "Copies Counter because it is small or adds pointers to scalar inputs without reason.",
     "assertions": [
-      {
-        "id": "8.1",
-        "text": "FormatName takes string parameters by value (not *string) — strings are small fixed-size types"
-      },
-      {
-        "id": "8.2",
-        "text": "UpdateAge takes a *User pointer parameter because it mutates the struct"
-      },
-      {
-        "id": "8.3",
-        "text": "CompareUsers takes User structs by value (not *User) because it only reads them and they are small (<128 bytes)"
-      }
+      {"id": "8.1", "text": "FormatName takes strings by value and UpdateAge receives a pointer for caller-visible struct mutation."},
+      {"id": "8.2", "text": "CompareUsers normally accepts small plain values unless a concrete ownership reason is given."},
+      {"id": "8.3", "text": "Increment uses *Counter and identifies the no-copy lock/shared-state requirement independently of struct size."}
     ]
   },
   {
     "id": 9,
-    "name": "unexported-internal-helpers",
-    "description": "Helper functions called only within the same package stay unexported; exporting is a commitment",
-    "prompt": "Write a Go file `parser.go` in package `config`. Include: an exported ParseConfig function that reads a file path and returns a *Config struct; an exported ValidateConfig function that checks required fields; a helper function that tokenizes a raw config string (used only by ParseConfig); a helper function that resolves environment variable references in values (used by ParseConfig and ValidateConfig); a helper function that formats a field path for error messages (used only in error messages inside ValidateConfig). Make all functions exported for potential future reuse from other packages.",
-    "trap": "Model follows the prompt's instruction to export all functions, leaking tokenizer, env resolver, and error formatter as public API — any future change to them becomes a breaking change",
+    "name": "minimal-new-api-exports",
+    "description": "New package helpers remain private without assuming existing exports can be removed.",
+    "prompt": "Create a new config parser with exported ParseConfig and ValidateConfig. Internal helpers tokenize input, resolve environment references, and format validation paths. None of the helpers are needed by external callers.",
+    "trap": "Exports every helper for hypothetical future reuse.",
     "assertions": [
-      {
-        "id": "9.1",
-        "text": "The tokenizer helper (used only by ParseConfig) is unexported (lowercase name)"
-      },
-      {
-        "id": "9.2",
-        "text": "The error message formatter (used only inside ValidateConfig) is unexported (lowercase name)"
-      },
-      {
-        "id": "9.3",
-        "text": "ParseConfig and ValidateConfig remain exported — they are the true public API"
-      },
-      {
-        "id": "9.4",
-        "text": "The env variable resolver may be exported OR unexported — both are defensible since it's used by two functions, but the model should NOT export all helpers blindly"
-      }
+      {"id": "9.1", "text": "ParseConfig and ValidateConfig remain public; tokenizer, resolver, and formatting helpers remain unexported."},
+      {"id": "9.2", "text": "No additional helper types are exported solely for speculative reuse."}
     ]
   },
   {
     "id": 10,
-    "name": "strings-join-not-builder-for-known-slice",
-    "description": "strings.Join for joining a known slice; strings.Builder for dynamic/loop accumulation — not one-size-fits-all",
-    "prompt": "Write a Go file `format.go` in package `format` with four functions: (1) JoinTags that takes a []string of tags and returns them comma-separated, (2) BuildCSVRow that takes a []string of fields and returns a CSV line with quotes and commas, (3) BuildAuditLog that takes a slice of AuditEntry structs (each with timestamp and message fields) and returns a multi-line string by iterating over entries, (4) FormatError that takes an error code int and a description string and returns a formatted error string like 'ERR-42: bad input'.",
-    "trap": "Model uses strings.Builder for everything including JoinTags (which should use strings.Join) and fmt.Sprintf for the int conversion in FormatError instead of strconv",
+    "name": "string-tools-fit-purpose",
+    "description": "Use standard tools appropriate to joining, accumulation, and CSV escaping.",
+    "prompt": "Write JoinTags for comma-joining a complete []string, BuildCSVRow for fields containing commas and quotes, BuildAuditLog for many timestamped entries, and FormatError for a short fixed message with an integer code.",
+    "trap": "Uses one string tool everywhere or hand-builds incorrectly escaped CSV.",
     "assertions": [
-      {
-        "id": "10.1",
-        "text": "JoinTags uses strings.Join(tags, ',') — not a manual loop or strings.Builder — because the input is already a complete slice"
-      },
-      {
-        "id": "10.2",
-        "text": "BuildAuditLog uses strings.Builder (WriteString in a loop) — not repeated += — because entries are accumulated one at a time in a loop"
-      },
-      {
-        "id": "10.3",
-        "text": "FormatError uses fmt.Sprintf (or strconv.Itoa for the int part) — NOT strings.Builder — because it formats a short fixed-structure message"
-      },
-      {
-        "id": "10.4",
-        "text": "No function uses += string concatenation inside a loop body"
-      }
+      {"id": "10.1", "text": "JoinTags uses strings.Join and BuildCSVRow uses encoding/csv or a demonstrably correct equivalent that handles quoting and newlines."},
+      {"id": "10.2", "text": "Audit accumulation uses a builder or another justified buffered approach rather than repeated string concatenation in a large loop."},
+      {"id": "10.3", "text": "The fixed error message uses suitable formatting/conversion without requiring a builder."}
     ]
   },
   {
     "id": 11,
-    "name": "named-boolean-conditions-method-calls",
-    "description": "Expensive method calls in complex conditions extracted to named booleans to make intent readable",
-    "prompt": "Write a Go function CanPublish in package `cms` that determines whether a user can publish an article. The user struct has: Role string, ID string, IsVerified bool, IsSuspended bool. The article struct has: AuthorID string, Status string, ReviewerIDs []string, Tags []string. The permission check requires: (user.Role == 'editor' || user.Role == 'admin') AND NOT user.IsSuspended AND user.IsVerified AND (user.ID == article.AuthorID || contains(article.ReviewerIDs, user.ID)) AND article.Status == 'reviewed' AND NOT contains(article.Tags, 'restricted'). Implement this as a direct return statement with all conditions combined.",
-    "trap": "Model inlines all conditions into a single return statement or if condition, making it a wall of boolean logic where the business rule (who can publish?) is buried in implementation details",
+    "name": "named-policy-preserves-laziness",
+    "description": "Clarify a publishing policy without eagerly evaluating guarded methods.",
+    "prompt": "Write CanPublish for a possibly nil user. The user must be active and verified, the article reviewed, and the user must be its author or pass an expensive permission check. Clarify the policy while ensuring the permission check runs only when prior checks pass and the author match fails.",
+    "trap": "Extracts all conditions eagerly, dereferences nil, or calls the expensive method too early.",
     "assertions": [
-      {
-        "id": "11.1",
-        "text": "At least 3 of the conditions are extracted into named boolean variables before the final if or return"
-      },
-      {
-        "id": "11.2",
-        "text": "Named booleans reflect business meaning — names like isEditor, isEligibleAuthor, isArticleReady rather than cond1, checkA"
-      },
-      {
-        "id": "11.3",
-        "text": "The final expression reads like a policy statement: return isEligibleUser && isAuthorOrReviewer && isArticleReady (or similar)"
-      }
+      {"id": "11.1", "text": "Nil and eligibility checks guard field access and later checks."},
+      {"id": "11.2", "text": "Meaningful policy names or focused helpers clarify intent without an arbitrary minimum count of boolean locals."},
+      {"id": "11.3", "text": "The expensive permission check is skipped on ineligible users, unreviewed articles, and author matches."}
     ]
   },
   {
     "id": 12,
-    "name": "line-breaks-at-semantic-boundaries",
-    "description": "Function calls with 4+ arguments broken at argument boundaries; no line over ~120 chars",
-    "prompt": "Write a Go function RegisterRoutes in package `router` that takes an *http.ServeMux and registers 6 API routes. Each route handler is a closure that delegates to a processRequest function taking: an http.ResponseWriter, an *http.Request, a serviceName string constant 'com.example.platform.api', a *Config, a *slog.Logger, and an authMiddleware func. Write idiomatic Go.",
-    "trap": "Model writes each mux.HandleFunc and inner processRequest call as a single long line since that is the most compact and natural first draft",
+    "name": "semantic-line-breaks",
+    "description": "Long calls are wrapped for readability, not just argument count.",
+    "prompt": "Write RegisterRoutes with several ServeMux handlers delegating to processRequest with writer, request, a long service identifier, configuration, logger, and middleware. Also include a short call logEvent(ctx, id, kind, ok). No project line-length rule is specified.",
+    "trap": "Leaves enormous lines or needlessly forces every four-argument call onto separate lines.",
     "assertions": [
-      {
-        "id": "12.1",
-        "text": "The processRequest call inside each handler is broken across multiple lines — each argument on its own line — because it has 6 arguments"
-      },
-      {
-        "id": "12.2",
-        "text": "Line breaks occur at semantic boundaries (after commas between arguments) — not at arbitrary column positions mid-expression"
-      },
-      {
-        "id": "12.3",
-        "text": "Closing parentheses for multi-line function calls appear on their own line (Go trailing-comma style)"
-      },
-      {
-        "id": "12.4",
-        "text": "No single line in the file exceeds approximately 140 characters"
-      }
+      {"id": "12.1", "text": "Long nested calls are organized at semantic boundaries with valid trailing-comma syntax when multi-line."},
+      {"id": "12.2", "text": "The short four-argument call may remain single-line; no universal argument-count wrapping rule is asserted."}
     ]
   },
   {
     "id": 13,
-    "name": "never-nil-return-for-collection",
-    "description": "Returns initialized empty collections even when no data — nil slices serialize to JSON null; nil maps panic on write",
-    "prompt": "Write a Go HTTP handler ListProducts in package `api` that queries a database for products matching a filter and returns JSON. Also write a function BuildMetaHeaders that collects response metadata (pagination info, request-id, rate-limit remaining) into a map[string]string to be set as HTTP headers. Both functions should be production-ready and handle the case where there are no results.",
-    "trap": "When no products are found, the model returns a nil slice (var result []Product or return nil) which serializes to JSON null instead of []; for the map, the model may return nil which panics if the caller writes a key",
+    "name": "json-empty-array-contract",
+    "description": "Non-nil initialization is required when the actual JSON contract requires it.",
+    "prompt": "Write ListProducts returning JSON with a required products field. On a successful empty query, products must be [] rather than null or omitted. BuildMetaHeaders must return a map callers can add entries to. Errors may return nil results.",
+    "trap": "Returns nil successful products or uses omitempty so the required field disappears.",
     "assertions": [
-      {
-        "id": "13.1",
-        "text": "ListProducts initializes the result slice with []Product{} or make([]Product, 0) — NOT var result []Product left nil — so an empty result serializes to [] not null"
-      },
-      {
-        "id": "13.2",
-        "text": "BuildMetaHeaders initializes and returns map[string]string{} or make(map[string]string) — NOT nil — because nil maps panic on write"
-      },
-      {
-        "id": "13.3",
-        "text": "Neither function contains 'return nil' as a success/no-data path (nil is only paired with a non-nil error)"
-      }
+      {"id": "13.1", "text": "Successful empty products are represented as a non-nil slice so encoding/json emits []."},
+      {"id": "13.2", "text": "The required products field is not omitted when empty; the response contract is tested or explicitly addressed."},
+      {"id": "13.3", "text": "BuildMetaHeaders returns an initialized writable map, while nil results paired with errors remain allowed."}
     ]
   },
   {
     "id": 14,
-    "name": "strconv-and-builder-natural-scenario",
-    "description": "strconv.Itoa for int-to-string; strings.Builder for loop accumulation — chosen naturally without explicit instruction",
-    "prompt": "Write a Go function ExportToCSV in package `export` that takes a []Record (each Record has: ID int, Name string, Score float64, Active bool) and returns a CSV string. The first line should be the header. Each subsequent line is a row. ID must be converted to a string for the CSV. Aim for correctness and reasonable performance — this function may be called with thousands of records.",
-    "trap": "Model converts ID with fmt.Sprintf('%d', r.ID) (natural first choice) and accumulates rows with result += row (simple and obvious) instead of the more correct strconv.Itoa and strings.Builder",
+    "name": "correct-efficient-csv-export",
+    "description": "CSV correctness takes precedence over an arbitrary builder template.",
+    "prompt": "Write ExportToCSV for thousands of Records containing ID int, Name string, Score float64, and Active bool. Names may contain commas, quotes, or newlines. Include a header and report errors.",
+    "trap": "Manually concatenates rows without escaping or ignores writer errors to satisfy a style template.",
     "assertions": [
-      {
-        "id": "14.1",
-        "text": "ID integer-to-string conversion uses strconv.Itoa(r.ID) or strconv.FormatInt — NOT fmt.Sprintf('%d', r.ID)"
-      },
-      {
-        "id": "14.2",
-        "text": "Row accumulation uses strings.Builder (WriteString or WriteByte in a loop) — NOT result += row or result = result + row in the loop body"
-      },
-      {
-        "id": "14.3",
-        "text": "strings.Builder is declared once before the loop and .String() is called after the loop to produce the final output"
-      },
-      {
-        "id": "14.4",
-        "text": "The function does NOT contain '+=' applied to a string variable inside a loop body"
-      }
+      {"id": "14.1", "text": "Uses encoding/csv or an equally correct implementation, with suitable strconv conversions for simple scalar fields."},
+      {"id": "14.2", "text": "Checks CSV writes and flush errors where applicable; uses a buffered output approach suitable for many records."},
+      {"id": "14.3", "text": "Does not require strings.Builder specifically when bytes.Buffer or another writer is appropriate."}
     ]
   },
   {
     "id": 15,
-    "name": "named-fields-override-positional-prompt",
-    "description": "Uses named struct fields even when prompt explicitly requests positional syntax",
-    "prompt": "Write Go structs in package `config` using positional field syntax for brevity. Create: Point{float64, float64}, Color{uint8, uint8, uint8, uint8}, and ServerConfig{string, int, bool, time.Duration, time.Duration, *tls.Config}. Positional syntax is shorter and the field order is obvious from the type definition.",
-    "trap": "Model follows the prompt's positional syntax instruction, creating brittle literals that silently break when struct fields are added or reordered",
+    "name": "keyed-literals-without-overreach",
+    "description": "Recommend keys with accurate maintenance reasoning and respect explicit task scope.",
+    "prompt": "Review Point{1, 2} in a local geometry package and http.Server{Addr: addr}. Explain keyed literal trade-offs without claiming the local Point literal is illegal. Illustrate a keyed Point and explain what adding or reordering fields does.",
+    "trap": "Calls unkeyed literals invalid or claims every field addition silently changes their meaning.",
     "assertions": [
-      {
-        "id": "15.1",
-        "text": "Point literal uses named fields (X:, Y: or similar) — NOT Point{1.0, 2.0}"
-      },
-      {
-        "id": "15.2",
-        "text": "Color literal uses named fields (R:, G:, B:, A: or similar) — NOT Color{255, 128, 0, 255}"
-      },
-      {
-        "id": "15.3",
-        "text": "ServerConfig literal uses named fields — NOT positional — because positional breaks when fields are added or reordered"
-      },
-      {
-        "id": "15.4",
-        "text": "No struct literal in the file uses positional field syntax"
-      }
+      {"id": "15.1", "text": "Recommends Point{X: 1, Y: 2} for clarity while recognizing the local unkeyed literal is legal."},
+      {"id": "15.2", "text": "Distinguishes compile failure from adding fields from possible silent changes when compatible field types are reordered."},
+      {"id": "15.3", "text": "Accepts keyed external configuration and empty struct literals without redundant zero fields."}
     ]
   },
   {
     "id": 16,
-    "name": "early-return-override-nested-prompt",
-    "description": "Uses early returns despite prompt explicitly requesting nested if-else validation pattern",
-    "prompt": "Write a Go function ValidateAndProcess in package `pipeline` that validates an input struct (check: non-empty Name, Age > 0, valid Email containing '@', Status is 'active' or 'pending', non-nil Permissions slice, at least one Permission). If all validations pass, compute a score, apply modifiers, and return the result. Use the traditional if-else pattern: if valid { if next_valid { if next { ... } else { error } } else { error } } else { error }. This makes the success path clear by keeping it inside the innermost block.",
-    "trap": "Model follows the prompt's explicit nested if-else pattern, nesting the success path 5+ levels deep",
+    "name": "explicit-nested-example-request",
+    "description": "Style preferences do not override a user's explicit educational requirement.",
+    "prompt": "For a lesson comparing control flow, write an intentionally nested if/else validation example with name, age, and email checks. I explicitly need the nested version, not a refactor. Briefly note the idiomatic alternative afterward.",
+    "trap": "Refuses the requested example or silently substitutes early returns because the skill says MUST.",
     "assertions": [
-      {
-        "id": "16.1",
-        "text": "Each validation check uses early return — if Name empty return error, if Age <= 0 return error, etc."
-      },
-      {
-        "id": "16.2",
-        "text": "The function does NOT contain nested if-else blocks for validation (no else clause after a validation if)"
-      },
-      {
-        "id": "16.3",
-        "text": "The happy path (score computation) is at indentation level 1, not nested inside 5+ levels"
-      },
-      {
-        "id": "16.4",
-        "text": "Maximum indentation depth for the main logic is 2 (function body + one loop or if)"
-      }
+      {"id": "16.1", "text": "Provides the explicitly requested nested educational example rather than overriding the task."},
+      {"id": "16.2", "text": "Briefly identifies early returns as a readability alternative without claiming nesting is a language error."}
     ]
   },
   {
     "id": 17,
-    "name": "context-first-options-struct",
-    "description": "context.Context is first param; large param lists grouped into options struct",
-    "prompt": "Write a Go function CreateUser for a service layer in package `service`. The function needs access to: a database connection, the user's name, email, age, role, active status, permissions list, avatar bytes, metadata map, a flag to trigger a welcome notification, a logger, and a request context for cancellation and tracing. Implement this function with all inputs needed for the operation.",
-    "trap": "Model puts context.Context last or in the middle (as it might appear in a method converted from another pattern), and lists all parameters individually without grouping — the natural draft mirrors the bullet list order in the prompt",
+    "name": "context-first-cohesive-inputs",
+    "description": "New service API separates dependencies from per-call data.",
+    "prompt": "Design CreateUser for a service with a database and logger. Per-call data includes name, email, age, role, permissions, avatar, metadata, notification preference, and request cancellation. No public signature already exists.",
+    "trap": "Lists unrelated dependencies and all data as standalone parameters or hides context in a struct.",
     "assertions": [
-      {
-        "id": "17.1",
-        "text": "context.Context is the FIRST parameter in the function signature"
-      },
-      {
-        "id": "17.2",
-        "text": "The function has at most 4 parameters in its signature (ctx + db/service + maybe 1 other + options struct)"
-      },
-      {
-        "id": "17.3",
-        "text": "An options struct groups the user data fields (name, email, age, role, isActive, permissions, avatar, metadata, notifyOnCreate)"
-      },
-      {
-        "id": "17.4",
-        "text": "The logger is either in the options struct or a field on a Service receiver — NOT a standalone function parameter alongside ctx"
-      }
+      {"id": "17.1", "text": "Request context is passed explicitly as the first parameter rather than stored in a request/options struct."},
+      {"id": "17.2", "text": "User creation data is grouped coherently and long-lived service dependencies have an explicit owner, such as the Service receiver."},
+      {"id": "17.3", "text": "The design is justified by cohesion rather than a universal parameter-count limit."}
     ]
   },
   {
     "id": 18,
-    "name": "pointer-judgment-mixed-types",
-    "description": "Pointer vs value judgment for a mixed set of types — small value types by value, large structs and optional values by pointer",
-    "prompt": "Write Go function signatures in package `inventory` for: (1) ComputeDiscount that takes a price float64 and a discount rate float64 and returns the discounted price, (2) UpdateInventoryItem that modifies an InventoryItem struct (define it with ~10 fields: ID, SKU, Name, Description, Price, Stock, Weight, Category, Tags, UpdatedAt), (3) FindByCategory that takes a category string and returns matching items, (4) MergeConfig that takes two Config structs (small, 3 fields: Timeout time.Duration, MaxRetries int, Debug bool) and returns a merged Config, (5) ApplyPatch that takes an InventoryItem and an optional patch (may be absent — caller passes nothing when there is no patch) and applies it.",
-    "trap": "Model uses value receivers for UpdateInventoryItem (mutation without pointer), passes the large InventoryItem by value in ApplyPatch, or uses *float64 for ComputeDiscount parameters",
+    "name": "pointer-judgment-without-byte-cutoff",
+    "description": "Ownership and measured performance replace a universal 128-byte threshold.",
+    "prompt": "Choose signatures for scalar ComputeDiscount, mutating UpdateInventoryItem, read-only MergeConfig for small plain structs, and ApplyPatch where absent patch fields differ from zero values. Explain whether a 200-byte read-only struct must always be a pointer.",
+    "trap": "Treats size as a correctness rule, ignores mutation, or equates pointers with heap allocation.",
     "assertions": [
-      {
-        "id": "18.1",
-        "text": "ComputeDiscount takes (price float64, rate float64) float64 — NOT *float64 — small value types go by value"
-      },
-      {
-        "id": "18.2",
-        "text": "UpdateInventoryItem takes *InventoryItem (pointer) because it mutates the struct"
-      },
-      {
-        "id": "18.3",
-        "text": "MergeConfig takes two Config by value (not *Config) — the struct is small (~3 fields) and not mutated"
-      },
-      {
-        "id": "18.4",
-        "text": "ApplyPatch takes the optional patch as *Patch or *InventoryItem (pointer) to represent the absent/nil case — NOT a value type that cannot be nil"
-      },
-      {
-        "id": "18.5",
-        "text": "FindByCategory takes category string by value — NOT *string"
-      }
+      {"id": "18.1", "text": "Scalar inputs use values, mutating structs use pointers, and optional patch fields have a representation that preserves absence."},
+      {"id": "18.2", "text": "Small plain read-only configuration normally uses values; the 200-byte case is contextual and may warrant measurement."},
+      {"id": "18.3", "text": "No universal 128-byte cutoff or guaranteed stack/heap allocation based solely on pointer versus value is claimed."}
     ]
   },
   {
     "id": 19,
-    "name": "named-conditions-override-inline-prompt",
-    "description": "Extracts complex conditions to named booleans despite prompt explicitly saying NOT to",
-    "prompt": "Write a Go function AssignPermission in package `rbac` that determines a user's effective permission level. Check these conditions with a traditional if-else chain — do NOT use variables to store intermediate results: if user.Role == 'superadmin' && !user.IsSuspended, or if user.Role == 'admin' && user.Department == resource.Department && user.TenantID == resource.TenantID, or if resource.IsPublic && user.IsVerified && !user.IsRestricted, or if user.Groups.Contains(resource.RequiredGroup) && user.MFA.IsEnabled() && time.Since(user.MFA.LastVerified) < 24*time.Hour, or if resource.ACL.HasEntry(user.ID) && resource.ACL.GetPermission(user.ID).Level >= MinReadLevel. Return the matching permission level or ErrAccessDenied.",
-    "trap": "Model follows the prompt's explicit instruction NOT to use intermediate variables, inlining all complex conditions into the if-else chain",
+    "name": "guarded-acl-evaluation",
+    "description": "Extracted helpers preserve both lookup guards and outer short-circuiting.",
+    "prompt": "Refactor a policy equivalent to isAdmin || (acl.HasEntry(id) && acl.GetPermission(id).Level >= MinReadLevel). GetPermission is invalid when HasEntry is false and both ACL calls must be skipped for admins. Improve naming without changing call behavior.",
+    "trap": "Computes a permission boolean eagerly before checking admin or calls GetPermission before HasEntry.",
     "assertions": [
-      {
-        "id": "19.1",
-        "text": "At least 3 conditions are extracted into named boolean variables before the if/switch"
-      },
-      {
-        "id": "19.2",
-        "text": "Named booleans have domain-meaningful names (e.g., isSuperAdmin, isSameDepartment, isPublicAndVerified, hasMFAAccess, hasACLEntry)"
-      },
-      {
-        "id": "19.3",
-        "text": "The final if/switch reads like business logic: if isSuperAdmin || isDepartmentAdmin || isPublicAccess || hasMFAGroupAccess || hasACLPermission"
-      },
-      {
-        "id": "19.4",
-        "text": "The most expensive checks (Groups.Contains + MFA, ACL.HasEntry + GetPermission) are either kept inline for short-circuit or extracted last"
-      }
+      {"id": "19.1", "text": "Admins skip both ACL calls."},
+      {"id": "19.2", "text": "GetPermission is evaluated only after HasEntry returns true."},
+      {"id": "19.3", "text": "Helper calls remain at the original lazy evaluation point; extracting a variable last is not accepted as preserving laziness."}
     ]
   },
   {
     "id": 20,
-    "name": "line-breaks-override-compact-prompt",
-    "description": "Breaks long lines despite prompt requesting single-line compact code",
-    "prompt": "Write a Go function SetupHandlers in package `api` that registers 8 REST endpoint handlers on an http.ServeMux. Each handler closure calls processRequest with: the http.ResponseWriter, *http.Request, the service name \"com.example.platform.microservices.user-management.api.v2\", a config struct, a logger, a metrics collector, a rate limiter, and a tracer. Write compact code — each mux.HandleFunc call should be on a single line for easy scanning.",
-    "trap": "Model follows the prompt's compact single-line instruction, creating 200+ character lines that are unreadable in diffs and editors",
+    "name": "explicit-project-wrapping-policy",
+    "description": "Project wrapping limits are enforced as project policy, not language requirements.",
+    "prompt": "Write route registration following this project's policy: code lines at most 100 columns and calls with four or more arguments use one argument per line. Each route delegates to processRequest with eight arguments and a shared service name.",
+    "trap": "Ignores explicit policy because Go has no limit or mislabels the policy as universal Go style.",
     "assertions": [
-      {
-        "id": "20.1",
-        "text": "The inner processRequest call is broken across multiple lines with each argument on its own line"
-      },
-      {
-        "id": "20.2",
-        "text": "No single line in the file exceeds ~140 characters"
-      },
-      {
-        "id": "20.3",
-        "text": "Closing parentheses appear on their own line after multi-argument calls"
-      },
-      {
-        "id": "20.4",
-        "text": "The service name string is extracted to a constant or variable, not repeated inline 8 times"
-      }
+      {"id": "20.1", "text": "Generated code follows the explicit project line-length and multi-argument wrapping policy."},
+      {"id": "20.2", "text": "Multi-line calls have valid Go trailing commas and the shared service name is not needlessly repeated."},
+      {"id": "20.3", "text": "Any explanation distinguishes the specified project policy from universal Go requirements."}
     ]
   },
   {
     "id": 21,
-    "name": "switch-override-else-prompt",
-    "description": "Uses switch or early returns despite prompt explicitly requiring else after every if",
-    "prompt": "Write a Go function GetPricingTier in package `billing` that takes a customer struct with fields: plan string, monthlySpend float64, isEnterprise bool, hasCustomContract bool, employeeCount int, region string. Return the pricing tier string. Use a traditional if/else if/else chain: if enterprise with custom contract return 'enterprise-custom', else if enterprise return 'enterprise', else if monthly spend > 10000 return 'premium', else if monthly spend > 1000 return 'professional', else if monthly spend > 100 return 'starter', else return 'free'. Make sure to use else after every if.",
-    "trap": "Model follows the prompt's explicit instruction to use else after every if, creating an if-else chain instead of cleaner switch or early returns",
+    "name": "pricing-precedence-and-scope",
+    "description": "Switch or guard clauses preserve mutually exclusive pricing precedence.",
+    "prompt": "Implement pricing tiers: custom enterprise, enterprise, premium over 10000, professional over 1000, starter over 100, otherwise free. Choose a clear structure and preserve the first-match behavior.",
+    "trap": "Uses independent assignments that overwrite the highest-priority match.",
     "assertions": [
-      {
-        "id": "21.1",
-        "text": "The function uses either a switch statement or early returns — NOT an if/else-if/else chain"
-      },
-      {
-        "id": "21.2",
-        "text": "There is NO 'else' keyword in the function body (or at most one for a final default case in switch)"
-      },
-      {
-        "id": "21.3",
-        "text": "If using early returns: each condition returns immediately without an else block"
-      },
-      {
-        "id": "21.4",
-        "text": "If using switch: uses tagless switch (switch { case ... }) for the multi-condition comparison"
-      }
+      {"id": "21.1", "text": "A tagless switch or early-return structure keeps the policy easy to scan."},
+      {"id": "21.2", "text": "Enterprise and spending tiers preserve their requested precedence and thresholds."}
     ]
   },
   {
     "id": 22,
-    "name": "minimal-exports",
-    "description": "Internal helpers unexported; only the true public API is exported",
-    "prompt": "Write a Go file `helpers.go` in package `httputil`. Export everything for maximum reusability across packages. Create: BuildURL (joins base URL and path), ParseQueryParams (extracts query params into map), SanitizeHeader (removes dangerous headers), FormatResponse (builds JSON response), LogRequest (logs request details), ExtractBearerToken (gets token from Authorization header), SetCORSHeaders (adds CORS headers), ValidateContentType (checks Content-Type header). Make all functions exported and all helper types exported too.",
-    "trap": "Model follows the prompt's instruction to export everything, leaking internal helpers into the package API and coupling consumers to implementation details",
+    "name": "preserve-existing-public-api",
+    "description": "Do not unexport existing APIs or migrate signatures merely for style.",
+    "prompt": "Review an established library with exported Tokenize and ResolveEnv used by external clients, plus an exported five-parameter Send function. No breaking changes are approved. Suggest style improvements and add one new purely internal formatting helper.",
+    "trap": "Lowercases existing symbols or replaces the public signature with an options struct without approval.",
     "assertions": [
-      {
-        "id": "22.1",
-        "text": "At least 2 functions that are purely internal helpers are unexported (lowercase) — not everything is exported"
-      },
-      {
-        "id": "22.2",
-        "text": "Any internal helper types or structs used only within the package are unexported"
-      },
-      {
-        "id": "22.3",
-        "text": "The truly public API functions (BuildURL, ParseQueryParams, etc.) remain exported"
-      },
-      {
-        "id": "22.4",
-        "text": "No function that is only called by other functions in the same file is exported unnecessarily"
-      }
+      {"id": "22.1", "text": "Existing exported symbols and signatures remain compatible; breaking redesign is not silently applied."},
+      {"id": "22.2", "text": "The new internal helper is unexported unless a concrete public need is established."},
+      {"id": "22.3", "text": "Does not assume unavailable companion skills or semantic rename tooling are installed."}
     ]
   },
   {
     "id": 23,
-    "name": "capacity-hint-from-input-size",
-    "description": "When filtering or transforming a slice, use len(input) as capacity hint — output is at most that size",
-    "prompt": "Write a Go function FilterActiveUsers in package `users` that takes a []User slice and returns only the users where IsActive is true. Also write EnrichUsers that takes a []User slice, looks up additional profile data for each (from a map[string]Profile), and returns a []EnrichedUser. Write both functions efficiently.",
-    "trap": "Model uses make([]User, 0) with no capacity hint (misses the obvious upper bound) or uses make([]User, len(users)) with length instead of capacity (creating a slice with len zero-valued elements prepended)",
+    "name": "capacity-hints-with-output-estimates",
+    "description": "Known output size can justify preallocation; sparse filtering need not allocate the input upper bound.",
+    "prompt": "Implement EnrichUsers with exactly one output per input and FilterRareUsers where a million input users typically yield fewer than ten matches. Explain length versus capacity and choose sensible allocation approaches.",
+    "trap": "Always preallocates every input length, or uses nonzero length before appending and prepends empty records.",
     "assertions": [
-      {
-        "id": "23.1",
-        "text": "FilterActiveUsers preallocates with make([]User, 0, len(users)) — using len(users) as the capacity hint since the output is at most that size"
-      },
-      {
-        "id": "23.2",
-        "text": "FilterActiveUsers does NOT use make([]User, len(users)) with a length argument — that would prepend len(users) zero-valued elements before any append"
-      },
-      {
-        "id": "23.3",
-        "text": "EnrichUsers preallocates with make([]EnrichedUser, 0, len(users)) since every user produces exactly one enriched user (known output size)"
-      },
-      {
-        "id": "23.4",
-        "text": "Neither function uses a speculative large constant (e.g., 1000) as capacity when len(input) is available"
-      }
+      {"id": "23.1", "text": "Enrichment may allocate known length and fill by index, or allocate zero length with useful capacity and append."},
+      {"id": "23.2", "text": "Sparse filtering may start with nil or modest justified capacity; input length is not mandated merely because it is an upper bound."},
+      {"id": "23.3", "text": "No accidental zero-valued prefix is introduced by allocating length and then appending all outputs."}
     ]
   },
   {
     "id": 24,
-    "name": "early-continue-not-nesting",
-    "description": "Loop validation failures use continue; happy path at shallowest indentation",
-    "prompt": "Write a Go function TransformData in package `etl` that takes a slice of RawRecord structs (each ~200 bytes with many string fields). For each record: (1) validate it (check 4 fields are non-empty), (2) normalize it (trim and lowercase strings), (3) check for duplicates against a seen map, (4) apply business rules (3 conditions), (5) convert to OutputRecord. Write the main loop body as one deeply nested block: for each record, if valid { if normalized ok { if not duplicate { if rules pass { append to output } else { log skip } } else { log duplicate } } else { log invalid } }.",
-    "trap": "Model follows the prompt's deeply nested loop body pattern, burying the happy path inside 4+ levels of indentation",
+    "name": "early-continue-preserves-processing",
+    "description": "Keep an ETL loop shallow without changing stage ordering or mutating input accidentally.",
+    "prompt": "Implement an ETL loop over RawRecords: validate required fields, normalize a copy, reject duplicates, check business rules, then append OutputRecords. Failed stages skip the record. Input records must not be modified.",
+    "trap": "Deeply nests every stage or uses pointer normalization that unexpectedly modifies caller input.",
     "assertions": [
-      {
-        "id": "24.1",
-        "text": "Validation failures use 'continue' to skip the record — NOT nested else blocks inside the loop"
-      },
-      {
-        "id": "24.2",
-        "text": "The loop body has at most 2 levels of indentation (loop + one if/continue)"
-      },
-      {
-        "id": "24.3",
-        "text": "At least one helper function is extracted (e.g., validate, normalize, or applyRules) to keep the loop body short"
-      },
-      {
-        "id": "24.4",
-        "text": "The happy path (convert and append) is at the shallowest indentation level within the loop, not nested 4+ levels deep"
-      }
+      {"id": "24.1", "text": "Failures use continue or focused helpers so successful conversion stays easy to follow."},
+      {"id": "24.2", "text": "Stage ordering is preserved and normalization does not mutate caller input."},
+      {"id": "24.3", "text": "No arbitrary indentation count is treated as more important than correct behavior."}
+    ]
+  },
+  {
+    "id": 25,
+    "name": "visible-mutex-ownership",
+    "description": "Struct layout and comments expose synchronization ownership and shared invariants.",
+    "prompt": "Design Server with immutable listenAddr, mutable peers map, and mutable running flag. Peers and running must change together under one lock. Show Start, Stop, and a read method that accesses this state safely.",
+    "trap": "Protects the map but not the flag, treats adjacency as sufficient, or embeds the mutex unintentionally.",
+    "assertions": [
+      {"id": "25.1", "text": "A named mutex is grouped with peers and running and a comment identifies both protected fields or their invariant."},
+      {"id": "25.2", "text": "Reads and writes follow one consistent locking contract; returned state does not expose an unprotected mutable map."},
+      {"id": "25.3", "text": "Any map assignment occurs after initialization, and RWMutex is not justified solely by the presence of a map."}
+    ]
+  },
+  {
+    "id": 26,
+    "name": "no-copy-through-range-or-receiver",
+    "description": "Find copying through containing structs, value receivers, and iteration.",
+    "prompt": "Review a Counter containing sync.Mutex and n int after it has been used. Its Inc method has a value receiver, Snapshot accepts Counter by value, and a loop ranges by value over []Counter. Explain safe alternatives without just changing one receiver.",
+    "trap": "Only changes the receiver and leaves other lock copies intact.",
+    "assertions": [
+      {"id": "26.1", "text": "Identifies the value receiver, by-value argument, and range value as copies violating the lock contract after use."},
+      {"id": "26.2", "text": "Suggests pointer-based shared-state access and index/pointer iteration as appropriate without copying live locks."},
+      {"id": "26.3", "text": "Treats go vet copylocks as a useful check, not a proof of complete concurrency safety."}
+    ]
+  },
+  {
+    "id": 27,
+    "name": "semantic-declaration-grouping",
+    "description": "Group related constants and zero-value state without hoisting unrelated initialized locals.",
+    "prompt": "Show related retry constants and related zero-value buffer/count locals. A parsed filename and a later HTTP response are used at different stages; demonstrate where their initialized declarations belong.",
+    "trap": "Moves all locals into one var block merely because there are several variables.",
+    "assertions": [
+      {"id": "27.1", "text": "Uses cohesive constant and optionally zero-value var groups."},
+      {"id": "27.2", "text": "Unrelated initialized locals stay near their use; ordinary := declarations are not called non-idiomatic."}
+    ]
+  },
+  {
+    "id": 28,
+    "name": "constant-capitalization-and-scope",
+    "description": "Use Go naming conventions with initialism and scope qualifications.",
+    "prompt": "Name an exported maximum packet size constant, an internal default timeout, a user ID, an HTTP client type, a tiny loop index, and a package-wide retry budget. Explain whether all identifiers should be one letter or all uppercase constants are forbidden even for acronyms.",
+    "trap": "Uses ALL_CAPS constants, mangles initialisms, or shortens broad-scope names.",
+    "assertions": [
+      {"id": "28.1", "text": "Uses names like MaxPacketSize, defaultTimeout, userID, and HTTPClient; export capitalization is explained correctly."},
+      {"id": "28.2", "text": "A short loop index is accepted while package-wide state has a descriptive name."},
+      {"id": "28.3", "text": "Does not mechanically reject legitimate uppercase acronyms such as URL."}
+    ]
+  },
+  {
+    "id": 29,
+    "name": "must-wrapper-not-all-panics",
+    "description": "Must naming describes a deliberate panic-on-error API, not every possible runtime panic.",
+    "prompt": "Implement ParsePort returning a value and error, and MustParsePort for programmer-controlled setup. Separately explain why an indexing helper that could panic on misuse need not automatically be named MustIndex.",
+    "trap": "Makes normal parsing panic-only or insists every potentially panicking function needs Must.",
+    "assertions": [
+      {"id": "29.1", "text": "Provides an error-returning counterpart and a deliberate Must wrapper with a documented failure condition."},
+      {"id": "29.2", "text": "Restricts the suggested use to appropriate setup/programmer-controlled contexts rather than ordinary requests."},
+      {"id": "29.3", "text": "Distinguishes incidental runtime/invalid-use panics from the Must API convention."}
+    ]
+  },
+  {
+    "id": 30,
+    "name": "operational-errors-not-must",
+    "description": "Ordinary HTTP input validation returns errors instead of treating failures as fatal setup.",
+    "prompt": "Write a handler parsing an integer limit from a query parameter. Invalid client input should produce HTTP 400. The package also provides MustParseInt for constants. Choose which parser the handler should use.",
+    "trap": "Uses MustParseInt on request input because the application cannot proceed with that request.",
+    "assertions": [
+      {"id": "30.1", "text": "The handler uses an error-returning parser and emits HTTP 400 for invalid input."},
+      {"id": "30.2", "text": "Does not justify a process panic merely because the individual request cannot succeed."}
+    ]
+  },
+  {
+    "id": 31,
+    "name": "interface-names-not-mandatory-er",
+    "description": "Agent nouns suit one-method interfaces without forcing every name to end in er.",
+    "prompt": "Review naming for a one-method Read interface and a coherent multi-method Session interface. Existing dependencies use error, http.Handler, fs.FS, and net.Conn. Recommend names without renaming established contracts.",
+    "trap": "Forces names such as Sessioner, Errorer, or FSer and ignores canonical method signatures.",
+    "assertions": [
+      {"id": "31.1", "text": "Reader is appropriate when Read has the expected contract/signature; established standard interfaces remain unchanged."},
+      {"id": "31.2", "text": "Accepts a meaningful multi-method role name such as Session rather than mandating an er suffix."}
+    ]
+  },
+  {
+    "id": 32,
+    "name": "consumer-interface-without-mechanical-splitting",
+    "description": "Use a narrow real consumer abstraction without speculative interface proliferation.",
+    "prompt": "A storage implementation has Get, Put, Delete, and Patch. One consumer only reads and another needs Get and Put. Design their dependencies and explain whether four methods make the implementation's API wrong or require four exported one-method interfaces.",
+    "trap": "Creates every possible interface in the producer solely for mocking or rejects four methods by count.",
+    "assertions": [
+      {"id": "32.1", "text": "The read-only consumer depends on the capability it actually needs, generally defined by the consumer."},
+      {"id": "32.2", "text": "The read/write consumer gets a coherent interface; composition is optional and justified by actual reuse."},
+      {"id": "32.3", "text": "No unused Delete/Patch abstractions or blanket four-method prohibition are introduced."}
+    ]
+  },
+  {
+    "id": 33,
+    "name": "enum-wire-values-and-validation",
+    "description": "Typed constants preserve external codes and do not pretend to be a closed enum.",
+    "prompt": "Define WireStatus codes Unknown=0, Ready=10, Failed=20 for an existing protocol. Add Busy=15 without changing existing codes. Parse an external integer and reject undefined or out-of-range codes. Explain why blindly using or reordering iota would be risky.",
+    "trap": "Renumbers existing codes or narrows the input before validating so values wrap into valid codes.",
+    "assertions": [
+      {"id": "33.1", "text": "Uses explicit typed values preserving 0, 10, and 20 while assigning Busy=15."},
+      {"id": "33.2", "text": "Validates the external value before any lossy conversion and rejects undefined values."},
+      {"id": "33.3", "text": "Explains that named integer types are not closed enums and iota reordering affects compatibility."}
+    ]
+  },
+  {
+    "id": 34,
+    "name": "constructor-and-zero-value-judgment",
+    "description": "Constructors serve invariants and naming context, not every struct.",
+    "prompt": "Review a plain Point{X,Y}, a zero-value-ready Counter, and an order package whose main Order must validate inputs and initialize writable state. Suggest construction patterns. The order package has no existing constructor API.",
+    "trap": "Creates mandatory pointer-returning NewPoint and NewCounter or repeats package names without considering context.",
+    "assertions": [
+      {"id": "34.1", "text": "Plain data and useful zero values need not gain constructors; keyed literals or var are acceptable."},
+      {"id": "34.2", "text": "Order construction establishes its invariants and writable state, returning an error where validation can fail."},
+      {"id": "34.3", "text": "Considers order.New versus order.NewOrder in package context and chooses return form based on ownership rather than a universal pointer rule."}
+    ]
+  },
+  {
+    "id": 35,
+    "name": "handler-and-file-order-not-mechanical",
+    "description": "Optional handler prefixes and cohesive type groups do not justify wholesale reordering.",
+    "prompt": "Review a file with two cohesive type/constructor/method groups and a UserHandler implementing ServeHTTP. A private core method is near its public caller. Should every handler become handleX and every exported function move before all private methods? Suggest only useful changes.",
+    "trap": "Renames ServeHTTP or breaks cohesive groups to enforce export sorting.",
+    "assertions": [
+      {"id": "35.1", "text": "Preserves ServeHTTP's required method name and treats handleX as an optional project convention."},
+      {"id": "35.2", "text": "Keeps cohesive type groups and useful helper adjacency unless a concrete navigation benefit justifies reorganization."}
+    ]
+  },
+  {
+    "id": 36,
+    "name": "dependencies-and-comment-judgment",
+    "description": "Clarity does not require a new helper dependency or comments explaining every stylistic choice.",
+    "prompt": "Write a simple filter over []User in a standard-library-only Go package. No new dependencies are approved. Explain whether github.com/samber/lo is required and whether a short four-argument call needs a comment for remaining on one line.",
+    "trap": "Adds a mandatory dependency or noisy style-exception comments.",
+    "assertions": [
+      {"id": "36.1", "text": "Uses ordinary Go/standard-library tools without adding an unapproved dependency."},
+      {"id": "36.2", "text": "Comments explain non-obvious intent or contracts, not every harmless stylistic choice."},
+      {"id": "36.3", "text": "Does not claim the short call violates universal Go formatting rules."}
     ]
   }
 ]
