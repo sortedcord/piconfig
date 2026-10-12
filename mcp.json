@@ -3,7 +3,7 @@
     "mcp": {
       "url": "https://ai.adityagupta.dev/mcp",
       "headers": {
-        "x-bf-vk": "!node -e \"const fs=require('fs'),os=require('os'),p=require('path');try{const a=JSON.parse(fs.readFileSync(p.join(os.homedir(),'.pi/agent/auth.json')));process.stdout.write(a['my-provider']?.key||'')}catch{}\""
+        "x-bf-vk": "!node -e \"const fs=require('fs'),os=require('os'),p=require('path');try{const a=JSON.parse(fs.readFileSync(p.join(os.homedir(),'.pi/agent/auth.json')));process.stdout.write(a['bifrost']?.key||a['my-provider']?.key||'')}catch{}\""
       },
       "exposure": "direct"
     }

@@ -1,6 +1,6 @@
 {
   "defaultModel": "Antigravity/gemini-3.8-flash-tiered",
-  "defaultProvider": "my-provider",
+  "defaultProvider": "bifrost",
   "deviceId": "0292d8c0-2732-4f79-ab8d-5b7cf1a8bd80",
   "lastChangelogVersion": "1.1.0",
   "packages": [

@@ -8,7 +8,7 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
  */
 export default function responsesLogprobs(pi: ExtensionAPI): void {
 	pi.on("before_provider_request", (event, ctx) => {
-		if (ctx.model?.provider !== "my-provider" || ctx.model.api !== "openai-responses") return;
+		if ((ctx.model?.provider !== "bifrost" && ctx.model?.provider !== "my-provider") || ctx.model.api !== "openai-responses") return;
 
 		const payload = event.payload;
 		if (!payload || typeof payload !== "object" || !("input" in payload) || !Array.isArray(payload.input)) return;

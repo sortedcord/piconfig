@@ -124,7 +124,7 @@ function formatCwdForFooter(cwd: string, home?: string): string {
 function formatWindowLabel(windowSeconds?: number, defaultLabel: string = "5h"): string {
 	if (windowSeconds == null) return defaultLabel;
 	if (windowSeconds === 18000) return "5h";
-	if (windowSeconds === 604800) return "weekly";
+	if (windowSeconds === 604800) return "W";
 	if (windowSeconds % 86400 === 0) return `${windowSeconds / 86400}d`;
 	if (windowSeconds % 3600 === 0) return `${windowSeconds / 3600}h`;
 	return defaultLabel;
