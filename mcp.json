@@ -6,6 +6,15 @@
         "x-bf-vk": "!node -e \"const fs=require('fs'),os=require('os'),p=require('path');try{const a=JSON.parse(fs.readFileSync(p.join(os.homedir(),'.pi/agent/auth.json')));process.stdout.write(a['my-provider']?.key||'')}catch{}\""
       },
       "exposure": "direct"
+    },
+    "codegraph": {
+      "command": "codegraph",
+      "args": [
+        "serve",
+        "--mcp"
+      ],
+      "exposure": "direct",
+      "description": "Code intelligence and knowledge graph for codebases indexed with CodeGraph"
     }
   }
 }

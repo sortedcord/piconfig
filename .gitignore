@@ -8,3 +8,7 @@ models-store.json
 
 # Binaries
 bin/
+
+# Caches
+__pycache__/
+*.pyc

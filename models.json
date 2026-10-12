@@ -5,7 +5,7 @@
       "authHeader": true,
       "models": [
         {
-          "id": "luna",
+          "id": "Codex Proxy/gpt-6-luna",
           "name": "GPT-6 Luna",
           "api": "openai-responses",
           "reasoning": true,
@@ -16,7 +16,7 @@
           "maxTokens": 128000
         },
         {
-          "id": "sol",
+          "id": "Codex Proxy/gpt-6.1-sol",
           "name": "GPT-6.1 Sol",
           "api": "openai-responses",
           "reasoning": true,
@@ -105,6 +105,7 @@
           "name": "Claude Opus 5.5",
           "api": "openai-completions",
           "reasoning": true,
+          "input": ["text", "image"],
           "thinkingLevelMap": {"off": null, "minimal": null, "low": null, "medium": "medium", "high": "high", "xhigh": null, "max": "max"},
           "contextWindow": 1000000,
           "maxTokens": 128000
