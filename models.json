@@ -27,7 +27,7 @@
           "maxTokens": 128000
         },
         {
-          "id": "astra",
+          "id": "codex/gpt-6-astra",
           "name": "GPT-6 Astra",
           "api": "openai-responses",
           "reasoning": true,
