@@ -4,17 +4,8 @@ import { truncateToWidth } from "@earendil-works/pi-tui";
 
 const BASE_LIMIT_URL = "https://ai.adityagupta.dev/providers";
 
-type Window = {
-	remaining_percent?: number;
-	window_seconds?: number;
-};
-
-type Pool = {
-	five_hour?: Window;
-	primary?: Window;
-	weekly?: Window;
-	secondary?: Window;
-};
+type Window = { remaining_percent?: number };
+type Pool = { five_hour?: Window; weekly?: Window };
 
 interface QuotaSource {
 	credId: string;
@@ -113,37 +104,17 @@ function formatCwdForFooter(cwd: string, home?: string): string {
 	return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
 }
 
-function formatWindowLabel(windowSeconds?: number, defaultLabel: string = "5h"): string {
-	if (windowSeconds == null) return defaultLabel;
-	if (windowSeconds === 604800) return "W";
-	if (windowSeconds % 86400 === 0) return `${windowSeconds / 86400}d`;
-	if (windowSeconds % 3600 === 0) return `${windowSeconds / 3600}h`;
-	return defaultLabel;
-}
-
-function renderQuotaLimit(
-	theme: any,
-	label: string,
-	pct: number | undefined,
-): string | null {
-	if (pct == null) return null;
-	const color = getLimitColor(pct);
-	return `${theme.fg("dim", `${label}: `)}${theme.fg(color, `${renderBlockBar(pct)} ${formatPercent(pct)}`)}`;
-}
+const WINDOWS = [
+	["five_hour", "5h"],
+	["weekly", "W"],
+] as const;
 
 function renderPool(theme: any, pool?: Pool): string[] {
-	if (!pool) return [];
-	const windows: [Window | undefined, string][] = [
-		[pool.five_hour ?? pool.primary, "5h"],
-		[pool.weekly ?? pool.secondary, "W"],
-	];
-	return windows.flatMap(([win, def]) => {
-		const rendered = renderQuotaLimit(
-			theme,
-			formatWindowLabel(win?.window_seconds, def),
-			win?.remaining_percent,
-		);
-		return rendered ? [rendered] : [];
+	return WINDOWS.flatMap(([key, label]) => {
+		const pct = pool?.[key]?.remaining_percent;
+		if (pct == null) return [];
+		const value = `${renderBlockBar(pct)} ${formatPercent(pct)}`;
+		return [`${theme.fg("dim", `${label}: `)}${theme.fg(getLimitColor(pct), value)}`];
 	});
 }
 
