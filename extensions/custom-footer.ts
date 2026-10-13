@@ -2,71 +2,75 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { readStoredCredential, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 
-const ANTIGRAVITY_LIMIT_URL = "https://ai.adityagupta.dev/providers/antigravity/status/limit";
-const CODEX_LIMIT_URL = "https://ai.adityagupta.dev/providers/codex/status/limit";
+const BASE_LIMIT_URL = "https://ai.adityagupta.dev/providers";
 
-let antigravityQuotaData: any = null;
-let antigravityFetching = false;
+type Window = {
+	remaining_percent?: number;
+	window_seconds?: number;
+};
 
-let codexQuotaData: any = null;
-let codexFetching = false;
+type Pool = {
+	five_hour?: Window;
+	primary?: Window;
+	weekly?: Window;
+	secondary?: Window;
+};
 
-async function fetchAntigravityLimits(onDone?: () => void) {
-	if (antigravityFetching) return;
-	const cred = readStoredCredential("antigravity");
+interface QuotaSource {
+	credId: string;
+	url: string;
+	headers: (key: string) => Record<string, string>;
+	pickPool: (data: any, haystack: string) => Pool | undefined;
+}
+
+const SOURCES: Record<string, QuotaSource> = {
+	antigravity: {
+		credId: "antigravity",
+		url: `${BASE_LIMIT_URL}/antigravity/status/limit`,
+		headers: (key) => ({ "x-goog-api-key": key }),
+		pickPool: (data, haystack) => {
+			const poolName = haystack.includes("gemini") ? "gemini" : "third_party";
+			return data?.pools?.[poolName];
+		},
+	},
+	codex: {
+		credId: "codex",
+		url: `${BASE_LIMIT_URL}/codex/status/limit`,
+		headers: (key) => ({ Authorization: `Bearer ${key}` }),
+		pickPool: (data) =>
+			data?.pools?.codex ?? (data?.pools ? (Object.values(data.pools)[0] as Pool) : undefined),
+	},
+};
+
+const quotaCache = new Map<string, any>();
+const inflight = new Set<string>();
+
+function findSource(model?: { id?: string; name?: string; provider?: string }) {
+	const haystack = `${model?.provider || ""} ${model?.id || ""} ${model?.name || ""}`.toLowerCase();
+	const key = Object.keys(SOURCES).find((name) => haystack.includes(name));
+	return key ? { key, source: SOURCES[key], haystack } : undefined;
+}
+
+async function fetchQuota(key: string, source: QuotaSource, onDone?: () => void) {
+	if (inflight.has(key)) return;
+	const cred = readStoredCredential(source.credId);
 	const apiKey = cred?.type === "api_key" ? cred.key : undefined;
 	if (!apiKey) return;
-	antigravityFetching = true;
+
+	inflight.add(key);
 	try {
-		const res = await fetch(ANTIGRAVITY_LIMIT_URL, {
-			headers: { "x-goog-api-key": apiKey },
+		const res = await fetch(source.url, {
+			headers: source.headers(apiKey),
 		});
 		if (res.ok) {
-			antigravityQuotaData = await res.json();
+			quotaCache.set(key, await res.json());
 			onDone?.();
 		}
 	} catch {
 		// ignore network errors
 	} finally {
-		antigravityFetching = false;
+		inflight.delete(key);
 	}
-}
-
-async function fetchCodexLimits(onDone?: () => void) {
-	if (codexFetching) return;
-	const cred = readStoredCredential("codex");
-	const apiKey = cred?.type === "api_key" ? cred.key : undefined;
-	if (!apiKey) return;
-	codexFetching = true;
-	try {
-		const res = await fetch(CODEX_LIMIT_URL, {
-			headers: { Authorization: `Bearer ${apiKey}` },
-		});
-		if (res.ok) {
-			codexQuotaData = await res.json();
-			onDone?.();
-		}
-	} catch {
-		// ignore network errors
-	} finally {
-		codexFetching = false;
-	}
-}
-
-function getAntigravityPoolForModel(
-	modelId?: string,
-	modelName?: string,
-	provider?: string,
-): "gemini" | "third_party" | null {
-	const lower = `${provider || ""} ${modelId || ""} ${modelName || ""}`.toLowerCase();
-	if (!lower.includes("antigravity")) return null;
-	if (lower.includes("gemini")) return "gemini";
-	return "third_party";
-}
-
-function isCodexModel(modelId?: string, modelName?: string, provider?: string): boolean {
-	const lower = `${provider || ""} ${modelId || ""} ${modelName || ""}`.toLowerCase();
-	return lower.includes("codex");
 }
 
 function formatPercent(pct: number | undefined): string {
@@ -80,25 +84,13 @@ function getLimitColor(pct: number): "success" | "warning" | "error" {
 	return "error";
 }
 
-function renderBlockBar(pct: number): string {
-	const chars = ["░", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"];
-	const val = (Math.max(0, Math.min(100, pct)) / 100) * 7;
-	const full = Math.floor(val);
-	const rem = val - full;
-	const frac = Math.round(rem * 8);
-	let res = "█".repeat(full);
-	if (full < 7) {
-		if (frac === 8) {
-			res += "█";
-			res += "░".repeat(7 - full - 1);
-		} else if (frac > 0) {
-			res += chars[frac];
-			res += "░".repeat(7 - full - 1);
-		} else {
-			res += "░".repeat(7 - full);
-		}
-	}
-	return res;
+function renderBlockBar(pct: number, width = 7): string {
+	const eighths = Math.round((Math.max(0, Math.min(100, pct)) / 100) * width * 8);
+	const full = Math.floor(eighths / 8);
+	const frac = eighths % 8;
+	const chars = ["", "▏", "▎", "▍", "▌", "▋", "▊", "▉"];
+	const bar = "█".repeat(full) + (full < width ? chars[frac] : "");
+	return bar.padEnd(width, "░");
 }
 
 function formatTokens(count: number): string {
@@ -123,7 +115,6 @@ function formatCwdForFooter(cwd: string, home?: string): string {
 
 function formatWindowLabel(windowSeconds?: number, defaultLabel: string = "5h"): string {
 	if (windowSeconds == null) return defaultLabel;
-	if (windowSeconds === 18000) return "5h";
 	if (windowSeconds === 604800) return "W";
 	if (windowSeconds % 86400 === 0) return `${windowSeconds / 86400}d`;
 	if (windowSeconds % 3600 === 0) return `${windowSeconds / 3600}h`;
@@ -140,32 +131,44 @@ function renderQuotaLimit(
 	return `${theme.fg("dim", `${label}: `)}${theme.fg(color, `${renderBlockBar(pct)} ${formatPercent(pct)}`)}`;
 }
 
+function renderPool(theme: any, pool?: Pool): string[] {
+	if (!pool) return [];
+	const windows: [Window | undefined, string][] = [
+		[pool.five_hour ?? pool.primary, "5h"],
+		[pool.weekly ?? pool.secondary, "W"],
+	];
+	return windows.flatMap(([win, def]) => {
+		const rendered = renderQuotaLimit(
+			theme,
+			formatWindowLabel(win?.window_seconds, def),
+			win?.remaining_percent,
+		);
+		return rendered ? [rendered] : [];
+	});
+}
+
 export default function (pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		ctx.ui.setFooter((tui, theme, footerData) => {
-			const unsubBranch = footerData.onBranchChange(() => tui.requestRender());
-
 			const updateQuota = () => {
-				if (getAntigravityPoolForModel(ctx.model?.id, ctx.model?.name, ctx.model?.provider)) {
-					fetchAntigravityLimits(() => tui.requestRender());
-				} else if (isCodexModel(ctx.model?.id, ctx.model?.name, ctx.model?.provider)) {
-					fetchCodexLimits(() => tui.requestRender());
+				const active = findSource(ctx.model);
+				if (active) {
+					fetchQuota(active.key, active.source, () => tui.requestRender());
 				}
 			};
 
 			updateQuota();
 
+			const refresh = () => {
+				updateQuota();
+				tui.requestRender();
+			};
+
 			const unsubs = [
-				unsubBranch,
-				pi.on("model_select", () => {
-					updateQuota();
-					tui.requestRender();
-				}),
+				footerData.onBranchChange(() => tui.requestRender()),
+				pi.on("model_select", refresh),
 				pi.on("thinking_level_select", () => tui.requestRender()),
-				pi.on("turn_end", () => {
-					updateQuota();
-					tui.requestRender();
-				}),
+				pi.on("turn_end", refresh),
 			];
 
 			return {
@@ -192,15 +195,10 @@ export default function (pi: ExtensionAPI) {
 					const contextUsage = ctx.getContextUsage();
 					const contextWindow = contextUsage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
 					const percent = contextUsage?.percent;
-					let contextStr = "";
 					if (contextWindow > 0) {
-						const pctStr = percent != null ? `${percent.toFixed(1)}%` : "?";
-						contextStr = `${pctStr}/${formatTokens(contextWindow)}`;
+						parts.push(theme.fg("dim", `${formatPercent(percent)}/${formatTokens(contextWindow)}`));
 					} else if (percent != null) {
-						contextStr = `${percent.toFixed(1)}%`;
-					}
-					if (contextStr) {
-						parts.push(theme.fg("dim", contextStr));
+						parts.push(theme.fg("dim", formatPercent(percent)));
 					}
 
 					// 4. Model
@@ -214,47 +212,11 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					// 6. Model limits (for Antigravity and Codex models)
-					const antigravityPool = getAntigravityPoolForModel(
-						ctx.model?.id,
-						ctx.model?.name,
-						ctx.model?.provider,
-					);
-					if (antigravityPool && antigravityQuotaData?.pools?.[antigravityPool]) {
-						const pool = antigravityQuotaData.pools[antigravityPool];
-						const fiveHour = pool.five_hour ?? pool.primary;
-						const weekly = pool.weekly ?? pool.secondary;
-						const item1 = renderQuotaLimit(
-							theme,
-							formatWindowLabel(fiveHour?.window_seconds, "5h"),
-							fiveHour?.remaining_percent,
-						);
-						if (item1) parts.push(item1);
-						const item2 = renderQuotaLimit(
-							theme,
-							formatWindowLabel(weekly?.window_seconds, "weekly"),
-							weekly?.remaining_percent,
-						);
-						if (item2) parts.push(item2);
-					} else if (isCodexModel(ctx.model?.id, ctx.model?.name, ctx.model?.provider)) {
-						const pool =
-							codexQuotaData?.pools?.codex ??
-							(codexQuotaData?.pools ? Object.values(codexQuotaData.pools)[0] : null);
-						if (pool) {
-							const primary = pool.five_hour ?? pool.primary;
-							const secondary = pool.weekly ?? pool.secondary;
-							const item1 = renderQuotaLimit(
-								theme,
-								formatWindowLabel(primary?.window_seconds, "5h"),
-								primary?.remaining_percent,
-							);
-							if (item1) parts.push(item1);
-							const item2 = renderQuotaLimit(
-								theme,
-								formatWindowLabel(secondary?.window_seconds, "weekly"),
-								secondary?.remaining_percent,
-							);
-							if (item2) parts.push(item2);
-						}
+					const active = findSource(ctx.model);
+					if (active) {
+						const data = quotaCache.get(active.key);
+						const pool = active.source.pickPool(data, active.haystack);
+						parts.push(...renderPool(theme, pool));
 					}
 
 					// Join items with a separator and dim styling
