@@ -1,38 +1,38 @@
-import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /**
  * Gateway compatibility: absent/null output_text.logprobs becomes an empty array.
  * Copy only changed wire paths; preserve existing arrays and saved response history.
- * Auto-loaded at startup. Use /restart after installing or changing this extension.
- * Calls bypassing before_provider_request, including some compaction paths, are not covered.
+ * Also used by isolated model requests, which bypass before_provider_request.
  */
-export default function responsesLogprobs(pi: ExtensionAPI): void {
-	pi.on("before_provider_request", (event, ctx) => {
-		if ((ctx.model?.provider !== "bifrost" && ctx.model?.provider !== "my-provider") || ctx.model.api !== "openai-responses") return;
+export function patchResponsesLogprobs(payload: unknown, model?: { provider: string; api: string }): unknown | undefined {
+	if ((model?.provider !== "bifrost" && model?.provider !== "my-provider") || model.api !== "openai-responses") return;
+	if (!payload || typeof payload !== "object" || !("input" in payload) || !Array.isArray(payload.input)) return;
 
-		const payload = event.payload;
-		if (!payload || typeof payload !== "object" || !("input" in payload) || !Array.isArray(payload.input)) return;
+	let patchedInput: unknown[] | undefined;
+	for (let inputIndex = 0; inputIndex < payload.input.length; inputIndex++) {
+		const item = payload.input[inputIndex];
+		if (!item || typeof item !== "object" || !Array.isArray(item.content)) continue;
 
-		let patchedInput: unknown[] | undefined;
-		for (let inputIndex = 0; inputIndex < payload.input.length; inputIndex++) {
-			const item = payload.input[inputIndex];
-			if (!item || typeof item !== "object" || !Array.isArray(item.content)) continue;
+		let patchedContent: unknown[] | undefined;
+		for (let contentIndex = 0; contentIndex < item.content.length; contentIndex++) {
+			const part = item.content[contentIndex];
+			if (!part || typeof part !== "object" || part.type !== "output_text" || part.logprobs != null) continue;
 
-			let patchedContent: unknown[] | undefined;
-			for (let contentIndex = 0; contentIndex < item.content.length; contentIndex++) {
-				const part = item.content[contentIndex];
-				if (!part || typeof part !== "object" || part.type !== "output_text" || part.logprobs != null) continue;
-
-				patchedContent ??= item.content.slice();
-				patchedContent[contentIndex] = { ...part, logprobs: [] };
-			}
-
-			if (patchedContent) {
-				patchedInput ??= payload.input.slice();
-				patchedInput[inputIndex] = { ...item, content: patchedContent };
-			}
+			patchedContent ??= [...item.content];
+			patchedContent[contentIndex] = { ...part, logprobs: [] };
 		}
 
-		return patchedInput ? { ...payload, input: patchedInput } : undefined;
-	});
+		if (patchedContent) {
+			patchedInput ??= payload.input.slice();
+			patchedInput[inputIndex] = { ...item, content: patchedContent };
+		}
+	}
+
+	return patchedInput ? { ...payload, input: patchedInput } : undefined;
+}
+
+/** Auto-loaded at startup. Run /reload after changing this extension. */
+export default function responsesLogprobs(pi: ExtensionAPI): void {
+	pi.on("before_provider_request", (event, ctx) => patchResponsesLogprobs(event.payload, ctx.model));
 }

@@ -22,7 +22,7 @@ The side request exposes no tools and runs no tool loop. It never sends a user/a
 
 This keeps the **main conversation's context window unchanged**, not the provider bill: the side request still sends the snapshot and consumes tokens. Provider-side retention policies still apply. Pi's main-session usage totals do not include this independent request.
 
-The snapshot uses Pi's recorded, compaction-aware context. Other extensions' request-time context transformations and not-yet-recorded prompt changes are not replayed.
+The snapshot uses Pi's recorded, compaction-aware context. Other extensions' request-time context transformations and not-yet-recorded prompt changes are not replayed. The side request explicitly applies the shared `../responses-logprobs.ts` gateway compatibility patch via `onPayload`: missing/null `output_text.logprobs` becomes `[]` for `bifrost` and `my-provider` using the Responses API. This changes only the outgoing payload, not saved history.
 
 ## Installation
 
@@ -33,7 +33,7 @@ This directory is auto-discovered as `~/.pi/agent/extensions/by-the-way/index.ts
 The Bun tests mock the model request, so they need no credentials and make no paid calls. With the Pi packages available in local `node_modules`, run:
 
 ```sh
-bun test extensions/by-the-way/by-the-way.test.ts
+bun test extensions/by-the-way
 ```
 
-Coverage includes snapshot immutability, system/tool handling, pending results, compaction, execution while the main chain is busy, cancellation isolation, shutdown cleanup, and narrow/wide terminal rendering.
+Coverage includes snapshot immutability, system/tool handling, pending results, compaction, execution while the main chain is busy, cancellation isolation, shutdown cleanup, narrow/wide terminal rendering, and logprobs patching through both the main hook and the side request. A real Responses wire-conversion test uses a mocked fetch (no network request).

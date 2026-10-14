@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Markdown, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 import { snapshotContext } from "./context.ts";
+import { patchResponsesLogprobs } from "../responses-logprobs.ts";
 
 export default function byTheWay(pi: ExtensionAPI) {
 	let active: AbortController | undefined;
@@ -64,6 +65,8 @@ export default function byTheWay(pi: ExtensionAPI) {
 							const stream = ctx.modelRegistry.streamSimple(model, { messages }, {
 								signal: controller.signal,
 								sessionId: randomUUID(),
+								// Independent registry calls do not emit before_provider_request.
+								onPayload: patchResponsesLogprobs,
 							});
 							for await (const event of stream) {
 								if (closed) break;

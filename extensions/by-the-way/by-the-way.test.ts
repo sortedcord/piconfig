@@ -55,11 +55,20 @@ test("/btw streams independently while busy, renders bounded UI, and cancels onl
 	let renderCount = 0;
 	const stream = new AssistantMessageEventStream();
 	const ctx = {
-		mode: "tui", model: { id: "test", provider: "openai" }, signal: mainAbort.signal,
+		mode: "tui", model: { id: "test", provider: "bifrost", api: "openai-responses" }, signal: mainAbort.signal,
 		isIdle: () => false,
 		getSystemPrompt: () => "main system",
 		sessionManager: { getBranch: () => [entry("u", null, { role: "user", content: "main question", timestamp: 1 })] },
-		modelRegistry: { streamSimple(_model: unknown, context: unknown, options: any) { request = context; sideSignal = options.signal; return stream; } },
+		modelRegistry: { streamSimple(model: unknown, context: unknown, options: any) {
+			request = context;
+			sideSignal = options.signal;
+			// Simulate provider wire conversion, then its onPayload callback.
+			const wirePayload = { input: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: "prior answer" }] }] };
+			const patched = options.onPayload(wirePayload, model);
+			expect(patched.input[0].content[0].logprobs).toEqual([]);
+			expect(wirePayload.input[0].content[0]).not.toHaveProperty("logprobs");
+			return stream;
+		} },
 		ui: { notify() {}, custom(factory: Function) {
 			return new Promise(resolve => {
 				component = factory({ terminal: { rows: 24 }, requestRender() { renderCount++; } }, { fg: (_c: string, s: string) => s, bold: (s: string) => s }, {}, resolve);
