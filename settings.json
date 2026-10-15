@@ -2,14 +2,66 @@
   "defaultModel": "Antigravity/gemini-3.8-flash-tiered",
   "defaultProvider": "bifrost",
   "deviceId": "0292d8c0-2732-4f79-ab8d-5b7cf1a8bd80",
-  "lastChangelogVersion": "1.1.0",
-  "packages": [
-    "npm:@majorgilles/pi-grill-me"
-  ],
   "enabledModels": [
     "bifrost/codex/gpt-6-luna",
     "bifrost/codex/gpt-6.1-sol",
     "bifrost/Antigravity/gemini-3.8-flash-tiered",
-    "bifrost/bedrock/anthropic.claude-opus-5-5"
-  ]
+    "bifrost/bedrock/anthropic.claude-opus-5-5",
+    "bifrost/Antigravity/gemini-3.5-flash-lite"
+  ],
+  "lastChangelogVersion": "1.1.0",
+  "packages": [
+    "npm:@majorgilles/pi-grill-me",
+    "npm:@diegopetrucci/pi-todo",
+    "npm:pi-subagents"
+  ],
+  "subagents": {
+    "agentOverrides": {
+      "scout": {
+        "model": "bifrost/codex/gpt-6-luna",
+        "thinking": "xhigh"
+      },
+      "worker": {
+        "model": "bifrost/Antigravity/gemini-3.8-flash-tiered",
+        "thinking": "high"
+      },
+      "reviewer": {
+        "model": "bifrost/codex/gpt-6.1-sol",
+        "thinking": "high"
+      },
+      "oracle": {
+        "model": "bifrost/bedrock/anthropic.claude-opus-5-5",
+        "thinking": "high"
+      },
+      "researcher": {
+        "model": "bifrost/Antigravity/gemini-3.8-flash-tiered",
+        "thinking": "high"
+      },
+      "delegate": {
+        "model": "bifrost/Antigravity/gemini-3.5-flash-lite",
+        "thinking": "high"
+      },
+      "evidence-auditor": {
+        "disabled": true
+      },
+      "claude-code": {
+        "disabled": true
+      },
+      "claude-code-writer": {
+        "disabled": true
+      },
+      "codex-exec": {
+        "disabled": true
+      },
+      "codex-exec-writer": {
+        "disabled": true
+      },
+      "cursor-agent": {
+        "disabled": true
+      },
+      "cursor-agent-writer": {
+        "disabled": true
+      }
+    }
+  }
 }

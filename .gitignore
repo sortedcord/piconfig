@@ -12,3 +12,4 @@ bin/
 # Caches
 __pycache__/
 *.pyc
+pi-subagents/
