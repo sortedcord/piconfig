@@ -7,6 +7,7 @@
     "bifrost/codex/gpt-6.1-sol",
     "bifrost/Antigravity/gemini-3.8-flash-tiered",
     "bifrost/bedrock/anthropic.claude-opus-5-5",
+    "bifrost/bedrock/anthropic.claude-sonnet-5",
     "bifrost/Antigravity/gemini-3.5-flash-lite"
   ],
   "lastChangelogVersion": "1.1.0",
@@ -26,7 +27,7 @@
         "thinking": "high"
       },
       "reviewer": {
-        "model": "bifrost/codex/gpt-6.1-sol",
+        "model": "bifrost/bedrock/anthropic.claude-sonnet-5",
         "thinking": "high"
       },
       "oracle": {
