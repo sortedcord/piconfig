@@ -12,7 +12,6 @@
   ],
   "lastChangelogVersion": "1.1.0",
   "packages": [
-    "npm:@majorgilles/pi-grill-me",
     "npm:@diegopetrucci/pi-todo",
     "npm:pi-subagents"
   ],
