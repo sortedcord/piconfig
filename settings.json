@@ -11,7 +11,5 @@
     "bifrost/Antigravity/gemini-3.5-flash-lite"
   ],
   "lastChangelogVersion": "1.1.0",
-  "packages": [
-    "npm:@diegopetrucci/pi-todo"
-  ]
+  "packages": []
 }
