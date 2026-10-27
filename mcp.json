@@ -6,6 +6,18 @@
         "x-bf-vk": "!node -e \"const fs=require('fs'),os=require('os'),p=require('path');try{const a=JSON.parse(fs.readFileSync(p.join(os.homedir(),'.pi/agent/auth.json')));process.stdout.write(a['bifrost']?.key||a['my-provider']?.key||'')}catch{}\""
       },
       "exposure": "direct"
+    },
+    "flipkart": {
+      "command": "node",
+      "args": [
+        "/home/sortedcord/flipkart_mcp/src/index.js"
+      ],
+      "env": {
+        "CDP_HTTP": "http://127.0.0.1:9222"
+      },
+      "cwd": "/home/sortedcord/flipkart_mcp",
+      "exposure": "direct",
+      "description": "Flipkart search, filters, product details, cart, orders, and network monitor"
     }
   }
 }
